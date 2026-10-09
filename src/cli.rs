@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Clone, Parser)]
 #[command(
@@ -8,6 +8,62 @@ use clap::Parser;
     about = "Creating a list of digests for files and/or directories"
 )]
 pub struct Cli {
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum Command {
+    /// Create a digest manifest from files/directories
+    Create(CreateArgs),
+    /// Verify files/directories against a digest manifest
+    Verify(VerifyArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CreateArgs {
+    #[command(flatten)]
+    pub common: CommonArgs,
+
+    #[arg(short = 'f', long = "force")]
+    pub force: bool,
+
+    #[arg(short = 'o', long = "output")]
+    pub output: PathBuf,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct VerifyArgs {
+    #[command(flatten)]
+    pub common: CommonArgs,
+
+    #[arg(short = 'n', long = "ignorecase")]
+    pub ignore_case: bool,
+
+    #[arg(short = 'i', long = "input")]
+    pub input: PathBuf,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CommonArgs {
+    #[command(flatten)]
+    pub algorithm_selection: AlgorithmSelection,
+
+    #[arg(short = 'v', long = "verbose")]
+    pub verbose: bool,
+
+    #[arg(long = "single")]
+    pub single: bool,
+
+    #[arg(short = 's', long = "style", default_value = "json")]
+    pub style: String,
+
+    #[arg(value_name = "dir")]
+    pub paths: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone, Default, Args)]
+pub struct AlgorithmSelection {
     #[arg(short = '1', long = "sha-1")]
     pub sha1: bool,
 
@@ -28,28 +84,4 @@ pub struct Cli {
 
     #[arg(short = 'a', long = "all")]
     pub all: bool,
-
-    #[arg(short = 'n', long = "ignorecase")]
-    pub ignore_case: bool,
-
-    #[arg(short = 'v', long = "verbose")]
-    pub verbose: bool,
-
-    #[arg(short = 'f', long = "force")]
-    pub force: bool,
-
-    #[arg(long = "single")]
-    pub single: bool,
-
-    #[arg(short = 'o', long = "output")]
-    pub output: Option<PathBuf>,
-
-    #[arg(short = 'i', long = "input")]
-    pub input: Option<PathBuf>,
-
-    #[arg(short = 's', long = "style", default_value = "json")]
-    pub style: String,
-
-    #[arg(value_name = "dir")]
-    pub paths: Vec<PathBuf>,
 }

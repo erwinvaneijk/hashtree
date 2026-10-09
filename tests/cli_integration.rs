@@ -13,6 +13,7 @@ fn generate_json_manifest_contains_expected_shape() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("create")
         .arg("-o")
         .arg(&output_manifest)
         .arg("--sha-256")
@@ -62,6 +63,7 @@ fn verify_mode_passes_for_fresh_manifest() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("create")
         .arg("-o")
         .arg(&output_manifest)
         .arg("--sha-256")
@@ -71,6 +73,7 @@ fn verify_mode_passes_for_fresh_manifest() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("verify")
         .arg("-i")
         .arg(&output_manifest)
         .arg("--sha-256")
@@ -87,6 +90,7 @@ fn verify_mode_reports_differences_when_file_changes() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("create")
         .arg("-o")
         .arg(&output_manifest)
         .arg("--sha-256")
@@ -102,6 +106,7 @@ fn verify_mode_reports_differences_when_file_changes() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("verify")
         .arg("-i")
         .arg(&output_manifest)
         .arg("--sha-256")
@@ -118,6 +123,7 @@ fn old_style_roundtrip_verification_passes() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("create")
         .arg("-o")
         .arg(&output_manifest)
         .arg("-s")
@@ -140,6 +146,7 @@ fn old_style_roundtrip_verification_passes() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("verify")
         .arg("-i")
         .arg(&output_manifest)
         .arg("-s")
@@ -161,6 +168,7 @@ fn output_file_requires_force_overwrite() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("create")
         .arg("-o")
         .arg(&output_manifest)
         .arg("--sha-256")
@@ -173,6 +181,7 @@ fn output_file_requires_force_overwrite() {
 
     Command::cargo_bin("hashtree")
         .expect("binary should build")
+        .arg("create")
         .arg("-o")
         .arg(&output_manifest)
         .arg("--force")

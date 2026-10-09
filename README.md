@@ -19,16 +19,23 @@ cargo build --release
 
 ```bash
 # Create digest manifest
-cargo run -- -o hashes.json --sha-256 /path/to/dir
+cargo run -- create -o hashes.json --sha-256 /path/to/dir
 
 # Verify against manifest
-cargo run -- -i hashes.json --sha-256 /path/to/dir
+cargo run -- verify -i hashes.json --sha-256 /path/to/dir
 
 # Use old legacy format
-cargo run -- -o hashes.txt -s old --all /path/to/dir
+cargo run -- create -o hashes.txt -s old --all /path/to/dir
 ```
 
-## CLI options
+## CLI structure
+
+```text
+hashtree create [OPTIONS] <dir>...
+hashtree verify [OPTIONS] <dir>...
+```
+
+Common options for both subcommands:
 
 ```text
 -1, --sha-1
@@ -38,13 +45,23 @@ cargo run -- -o hashes.txt -s old --all /path/to/dir
     --md5
     --md2
 -a, --all
--n, --ignorecase
 -v, --verbose
--f, --force
     --single
--o, --output <OUTPUT>
--i, --input <INPUT>
 -s, --style <STYLE>    (json|old|xml)
+```
+
+Create-specific options:
+
+```text
+-o, --output <OUTPUT>
+-f, --force
+```
+
+Verify-specific options:
+
+```text
+-i, --input <INPUT>
+-n, --ignorecase
 ```
 
 `xml` is recognized for compatibility but intentionally not implemented (matching `jHashtools`).

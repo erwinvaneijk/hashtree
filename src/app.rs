@@ -1,12 +1,14 @@
 use std::collections::BTreeSet;
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use chrono::Local;
 
 use crate::algorithm::Algorithm;
-use crate::cli::Cli;
+use crate::cli::{
+    AlgorithmSelection, Cli, Command as CliCommand, CommonArgs, CreateArgs, VerifyArgs,
+};
 use crate::error::{AppError, AppResult};
 use crate::hashing::{generate_digests, hash_file};
 use crate::model::DirHasherResult;
@@ -17,109 +19,167 @@ use crate::util::is_same_file;
 use crate::verify::{index_result, missing, not_intersect};
 use crate::{DEFAULT_ALGORITHM, VERSION};
 
+#[derive(Debug, Clone)]
+struct SharedCommandOptions {
+    style: PersistenceStyle,
+    algorithms: Vec<Algorithm>,
+    verbose: bool,
+    single: bool,
+    paths: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+struct CreateCommand {
+    shared: SharedCommandOptions,
+    output: PathBuf,
+    force: bool,
+}
+
+#[derive(Debug, Clone)]
+struct VerifyCommand {
+    shared: SharedCommandOptions,
+    input: PathBuf,
+    ignore_case: bool,
+}
+
+#[derive(Debug, Clone)]
+enum AppCommand {
+    Create(CreateCommand),
+    Verify(VerifyCommand),
+}
+
+impl AppCommand {
+    fn from_cli(cli: Cli) -> AppResult<Self> {
+        match cli.command {
+            CliCommand::Create(args) => Ok(Self::Create(resolve_create(args)?)),
+            CliCommand::Verify(args) => Ok(Self::Verify(resolve_verify(args)?)),
+        }
+    }
+}
+
+fn resolve_create(args: CreateArgs) -> AppResult<CreateCommand> {
+    Ok(CreateCommand {
+        shared: resolve_common(args.common)?,
+        output: args.output,
+        force: args.force,
+    })
+}
+
+fn resolve_verify(args: VerifyArgs) -> AppResult<VerifyCommand> {
+    Ok(VerifyCommand {
+        shared: resolve_common(args.common)?,
+        input: args.input,
+        ignore_case: args.ignore_case,
+    })
+}
+
+fn resolve_common(common: CommonArgs) -> AppResult<SharedCommandOptions> {
+    let mut algorithms = selected_algorithms(&common.algorithm_selection);
+    if algorithms.is_empty() {
+        algorithms.push(Algorithm::from_name(DEFAULT_ALGORITHM));
+    }
+
+    Ok(SharedCommandOptions {
+        style: PersistenceStyle::parse(&common.style)?,
+        algorithms,
+        verbose: common.verbose,
+        single: common.single,
+        paths: common.paths,
+    })
+}
+
 pub fn run(cli: Cli) -> ExitCode {
     let start = std::time::Instant::now();
     eprintln!("Version: {VERSION}");
 
-    let style = match PersistenceStyle::parse(&cli.style) {
-        Ok(style) => style,
+    let command = match AppCommand::from_cli(cli) {
+        Ok(command) => command,
         Err(error) => {
             eprintln!("{error}");
             return ExitCode::from(2);
         }
     };
 
-    let mut algorithms = selected_algorithms(&cli);
-    if algorithms.is_empty() {
-        algorithms.push(Algorithm::from_name(DEFAULT_ALGORITHM));
-    }
-
-    let status = if cli.input.is_some() && cli.output.is_some() {
-        eprintln!("Make up your mind. Cannot do -i and -o at the same time.");
-        ExitCode::from(1)
-    } else if let Some(input_file) = &cli.input {
-        match verify_mode(&cli, style, &algorithms, input_file) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(error) => {
-                eprintln!("{error}");
-                ExitCode::from(254)
-            }
-        }
-    } else if let Some(output_file) = &cli.output {
-        match write_mode(&cli, style, &algorithms, output_file) {
+    let status = match command {
+        AppCommand::Create(command) => match write_mode(&command) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("{error}");
                 ExitCode::from(255)
             }
-        }
-    } else {
-        eprintln!("You need either -i or -o");
-        ExitCode::from(2)
+        },
+        AppCommand::Verify(command) => match verify_mode(&command) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("{error}");
+                ExitCode::from(254)
+            }
+        },
     };
 
     eprintln!("Done: {:.3}", start.elapsed().as_secs_f64());
     status
 }
 
-fn selected_algorithms(cli: &Cli) -> Vec<Algorithm> {
+fn selected_algorithms(selection: &AlgorithmSelection) -> Vec<Algorithm> {
     let mut names = BTreeSet::new();
 
-    if cli.all || cli.sha256 {
+    if selection.all || selection.sha256 {
         names.insert(Algorithm::Sha256);
     }
-    if cli.all || cli.sha1 {
+    if selection.all || selection.sha1 {
         names.insert(Algorithm::Sha1);
     }
-    if cli.all || cli.sha384 {
+    if selection.all || selection.sha384 {
         names.insert(Algorithm::Sha384);
     }
-    if cli.all || cli.sha512 {
+    if selection.all || selection.sha512 {
         names.insert(Algorithm::Sha512);
     }
-    if cli.all || cli.md5 {
+    if selection.all || selection.md5 {
         names.insert(Algorithm::Md5);
     }
-    if cli.all || cli.md2 {
+    if selection.all || selection.md2 {
         names.insert(Algorithm::Md2);
     }
 
     names.into_iter().collect()
 }
 
-fn write_mode(
-    cli: &Cli,
-    style: PersistenceStyle,
-    algorithms: &[Algorithm],
-    output_file: &Path,
-) -> AppResult<()> {
-    if matches!(style, PersistenceStyle::Xml) {
+fn write_mode(command: &CreateCommand) -> AppResult<()> {
+    if matches!(command.shared.style, PersistenceStyle::Xml) {
         return Err(AppError::XmlNotSupported);
     }
 
-    if output_file.exists() && !cli.force {
-        return Err(AppError::OutputExists(output_file.to_path_buf()));
+    if command.output.exists() && !command.force {
+        return Err(AppError::OutputExists(command.output.clone()));
     }
 
-    let digests = generate_digests(&cli.paths, algorithms, !cli.single, cli.verbose)?;
-    persist_result(output_file, style, &digests)?;
+    let digests = generate_digests(
+        &command.shared.paths,
+        &command.shared.algorithms,
+        !command.shared.single,
+        command.shared.verbose,
+    )?;
+    persist_result(&command.output, command.shared.style, &digests)?;
 
     let summary_algorithms = digests
         .content
         .values()
         .next()
         .map(|digest| digest.algorithms_enum())
-        .unwrap_or_else(|| algorithms.to_vec());
+        .unwrap_or_else(|| command.shared.algorithms.clone());
 
-    let output_hash =
-        hash_file(output_file, &summary_algorithms).map_err(|source| AppError::HashOutputFile {
-            path: output_file.to_path_buf(),
+    let output_hash = hash_file(&command.output, &summary_algorithms).map_err(|source| {
+        AppError::HashOutputFile {
+            path: command.output.clone(),
             source,
-        })?;
+        }
+    })?;
     let mut summary = DirHasherResult::default();
     summary
         .content
-        .insert(output_file.to_string_lossy().to_string(), output_hash);
+        .insert(command.output.to_string_lossy().to_string(), output_hash);
 
     let username = std::env::var("USER").unwrap_or_else(|_| "unknown".to_string());
     let mut stderr = io::stderr().lock();
@@ -129,21 +189,21 @@ fn write_mode(
     Ok(())
 }
 
-fn verify_mode(
-    cli: &Cli,
-    style: PersistenceStyle,
-    algorithms: &[Algorithm],
-    input_file: &Path,
-) -> AppResult<()> {
-    if matches!(style, PersistenceStyle::Xml) {
+fn verify_mode(command: &VerifyCommand) -> AppResult<()> {
+    if matches!(command.shared.style, PersistenceStyle::Xml) {
         return Err(AppError::XmlNotSupported);
     }
 
-    let verification = load_result(input_file, style)?;
-    let measured = generate_digests(&cli.paths, algorithms, !cli.single, cli.verbose)?;
+    let verification = load_result(&command.input, command.shared.style)?;
+    let measured = generate_digests(
+        &command.shared.paths,
+        &command.shared.algorithms,
+        !command.shared.single,
+        command.shared.verbose,
+    )?;
 
-    let measured_index = index_result(&measured, cli.ignore_case);
-    let verification_index = index_result(&verification, cli.ignore_case);
+    let measured_index = index_result(&measured, command.ignore_case);
+    let verification_index = index_result(&verification, command.ignore_case);
 
     let differences = not_intersect(&measured_index, &verification_index);
 
@@ -157,10 +217,10 @@ fn verify_mode(
 
     if differences.len() == 1
         && let Some(entry) = differences.values().next()
-        && is_same_file(Path::new(&entry.path), input_file)
+        && is_same_file(Path::new(&entry.path), &command.input)
     {
         writeln!(out, "*** PASSED VERIFICATION ***")?;
-        writeln!(out, "Printing info on {}", input_file.display())?;
+        writeln!(out, "Printing info on {}", command.input.display())?;
         let mut single = DirHasherResult::default();
         single
             .content
@@ -175,7 +235,7 @@ fn verify_mode(
     writeln!(
         out,
         "These entries are seen, but missing in the {} list",
-        input_file.display()
+        command.input.display()
     )?;
     print_missing_entries(&seen_missing, &mut out)?;
 
@@ -183,7 +243,7 @@ fn verify_mode(
     writeln!(
         out,
         "These entries are in the {} list, but not in the directory and/or files.",
-        input_file.display()
+        command.input.display()
     )?;
     print_missing_entries(&listed_missing, &mut out)?;
 
@@ -192,49 +252,31 @@ fn verify_mode(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use crate::algorithm::Algorithm;
-    use crate::cli::Cli;
+    use crate::cli::AlgorithmSelection;
 
     use super::selected_algorithms;
 
-    fn base_cli() -> Cli {
-        Cli {
-            sha1: false,
-            sha256: false,
-            sha384: false,
-            sha512: false,
-            md5: false,
-            md2: false,
-            all: false,
-            ignore_case: false,
-            verbose: false,
-            force: false,
-            single: false,
-            output: None,
-            input: None,
-            style: "json".to_string(),
-            paths: vec![PathBuf::from(".")],
-        }
-    }
-
     #[test]
     fn selected_algorithms_returns_expected_set() {
-        let mut cli = base_cli();
-        cli.sha256 = true;
-        cli.md5 = true;
+        let selection = AlgorithmSelection {
+            sha256: true,
+            md5: true,
+            ..AlgorithmSelection::default()
+        };
 
-        let algorithms = selected_algorithms(&cli);
+        let algorithms = selected_algorithms(&selection);
         assert_eq!(algorithms, vec![Algorithm::Md5, Algorithm::Sha256]);
     }
 
     #[test]
     fn selected_algorithms_all_includes_all_supported() {
-        let mut cli = base_cli();
-        cli.all = true;
+        let selection = AlgorithmSelection {
+            all: true,
+            ..AlgorithmSelection::default()
+        };
 
-        let algorithms = selected_algorithms(&cli);
+        let algorithms = selected_algorithms(&selection);
         assert_eq!(
             algorithms,
             vec![
