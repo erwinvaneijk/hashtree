@@ -187,20 +187,11 @@ impl<'de> Deserialize<'de> for DigestResult {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct DirHasherResult {
     #[serde(rename = "constructionInfo")]
     construction_info: ConstructionInfo,
     content: BTreeMap<String, DigestResult>,
-}
-
-impl Default for DirHasherResult {
-    fn default() -> Self {
-        Self {
-            construction_info: ConstructionInfo::default(),
-            content: BTreeMap::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -351,20 +342,19 @@ fn verify_mode(
         return Ok(());
     }
 
-    if differences.len() == 1 {
-        if let Some(entry) = differences.values().next()
-            && is_same_file(Path::new(&entry.path), input_file)
-        {
-            writeln!(out, "*** PASSED VERIFICATION ***").map_err(|error| error.to_string())?;
-            writeln!(out, "Printing info on {}", input_file.display())
-                .map_err(|error| error.to_string())?;
-            let mut single = DirHasherResult::default();
-            single
-                .content
-                .insert(entry.path.clone(), entry.digests.clone());
-            pretty_print_result(&single, &mut out).map_err(|error| error.to_string())?;
-            return Ok(());
-        }
+    if differences.len() == 1
+        && let Some(entry) = differences.values().next()
+        && is_same_file(Path::new(&entry.path), input_file)
+    {
+        writeln!(out, "*** PASSED VERIFICATION ***").map_err(|error| error.to_string())?;
+        writeln!(out, "Printing info on {}", input_file.display())
+            .map_err(|error| error.to_string())?;
+        let mut single = DirHasherResult::default();
+        single
+            .content
+            .insert(entry.path.clone(), entry.digests.clone());
+        pretty_print_result(&single, &mut out).map_err(|error| error.to_string())?;
+        return Ok(());
     }
 
     writeln!(out, "There are differences.").map_err(|error| error.to_string())?;
