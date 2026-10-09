@@ -11,13 +11,13 @@ use sha2::{Sha256, Sha384, Sha512};
 use walkdir::WalkDir;
 
 use crate::BLOCK_READ_SIZE;
+use crate::algorithm::Algorithm;
 use crate::error::{AppError, AppResult};
 use crate::model::{DigestResult, DirHasherResult};
-use crate::util::normalize_algorithm_name;
 
 pub fn generate_digests(
     paths: &[PathBuf],
-    algorithms: &[String],
+    algorithms: &[Algorithm],
     multi_threaded: bool,
     verbose: bool,
 ) -> AppResult<DirHasherResult> {
@@ -103,13 +103,11 @@ pub fn is_symlink(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub fn hash_file(path: &Path, algorithms: &[String]) -> io::Result<DigestResult> {
+pub fn hash_file(path: &Path, algorithms: &[Algorithm]) -> io::Result<DigestResult> {
     let mut file = File::open(path)?;
-    let mut hashers: Vec<(String, AnyHasher)> = algorithms
+    let mut hashers: Vec<(Algorithm, AnyHasher)> = algorithms
         .iter()
-        .filter_map(|name| {
-            create_hasher(name).map(|hasher| (normalize_algorithm_name(name), hasher))
-        })
+        .filter_map(|algorithm| create_hasher(algorithm).map(|hasher| (algorithm.clone(), hasher)))
         .collect();
 
     let mut buffer = vec![0_u8; BLOCK_READ_SIZE];
@@ -126,7 +124,7 @@ pub fn hash_file(path: &Path, algorithms: &[String]) -> io::Result<DigestResult>
 
     let mut result = DigestResult::default();
     for (algorithm, hasher) in hashers {
-        result.add_digest(&algorithm, &hasher.finalize_hex());
+        result.add_digest(algorithm, &hasher.finalize_hex());
     }
 
     Ok(result)
@@ -165,14 +163,14 @@ impl AnyHasher {
     }
 }
 
-pub fn create_hasher(name: &str) -> Option<AnyHasher> {
-    match normalize_algorithm_name(name).as_str() {
-        "md2" => Some(AnyHasher::Md2(Md2::new())),
-        "md5" => Some(AnyHasher::Md5(Md5::new())),
-        "sha-1" => Some(AnyHasher::Sha1(Sha1::new())),
-        "sha-256" => Some(AnyHasher::Sha256(Sha256::new())),
-        "sha-384" => Some(AnyHasher::Sha384(Sha384::new())),
-        "sha-512" => Some(AnyHasher::Sha512(Sha512::new())),
+pub fn create_hasher(name: &Algorithm) -> Option<AnyHasher> {
+    match name {
+        Algorithm::Md2 => Some(AnyHasher::Md2(Md2::new())),
+        Algorithm::Md5 => Some(AnyHasher::Md5(Md5::new())),
+        Algorithm::Sha1 => Some(AnyHasher::Sha1(Sha1::new())),
+        Algorithm::Sha256 => Some(AnyHasher::Sha256(Sha256::new())),
+        Algorithm::Sha384 => Some(AnyHasher::Sha384(Sha384::new())),
+        Algorithm::Sha512 => Some(AnyHasher::Sha512(Sha512::new())),
         _ => None,
     }
 }

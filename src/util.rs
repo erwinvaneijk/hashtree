@@ -11,10 +11,6 @@ pub fn split_hex(input: &str, group_size: usize) -> String {
     output
 }
 
-pub fn normalize_algorithm_name(name: &str) -> String {
-    name.trim().to_ascii_lowercase()
-}
-
 pub fn normalize_hex(value: &str) -> String {
     value
         .chars()

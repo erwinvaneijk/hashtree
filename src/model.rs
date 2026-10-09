@@ -6,7 +6,8 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::VERSION;
-use crate::util::{normalize_algorithm_name, normalize_hex};
+use crate::algorithm::Algorithm;
+use crate::util::normalize_hex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,22 +35,24 @@ impl Default for ConstructionInfo {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DigestResult {
-    pub digests: BTreeMap<String, String>,
+    pub digests: BTreeMap<Algorithm, String>,
 }
 
 impl DigestResult {
-    pub fn add_digest(&mut self, algorithm: &str, hex_digest: &str) {
-        let algorithm = normalize_algorithm_name(algorithm);
+    pub fn add_digest(&mut self, algorithm: Algorithm, hex_digest: &str) {
         let hex_digest = normalize_hex(hex_digest);
         self.digests.insert(algorithm, hex_digest);
     }
 
+    pub fn add_digest_name(&mut self, algorithm: &str, hex_digest: &str) {
+        self.add_digest(Algorithm::from_name(algorithm), hex_digest);
+    }
+
     pub fn matches(&self, other: &Self) -> bool {
-        let common: Vec<&str> = self
+        let common: Vec<&Algorithm> = self
             .digests
             .keys()
             .filter(|name| other.digests.contains_key(*name))
-            .map(String::as_str)
             .collect();
 
         if common.is_empty() {
@@ -68,6 +71,10 @@ impl DigestResult {
     }
 
     pub fn algorithms(&self) -> Vec<String> {
+        self.digests.keys().map(ToString::to_string).collect()
+    }
+
+    pub fn algorithms_enum(&self) -> Vec<Algorithm> {
         self.digests.keys().cloned().collect()
     }
 }
@@ -96,7 +103,7 @@ impl<'de> Deserialize<'de> for DigestResult {
             let (algorithm, value) = digest
                 .split_once(':')
                 .ok_or_else(|| D::Error::custom(format!("Invalid digest format: {digest}")))?;
-            result.add_digest(algorithm, value);
+            result.add_digest_name(algorithm, value);
         }
         Ok(result)
     }

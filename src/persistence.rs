@@ -4,6 +4,7 @@ use std::path::Path;
 
 use chrono::Local;
 
+use crate::algorithm::Algorithm;
 use crate::error::{AppError, AppResult};
 use crate::model::{DigestResult, DirHasherResult};
 use crate::style::PersistenceStyle;
@@ -47,7 +48,7 @@ fn persist_oldstyle(path: &Path, result: &DirHasherResult) -> AppResult<()> {
     for (file_path, digest_result) in &result.content {
         writeln!(&mut file, "{file_path}")?;
         for (algorithm, hex_digest) in &digest_result.digests {
-            let label = oldstyle_label(algorithm);
+            let label = algorithm.oldstyle_label();
             let grouped = split_hex(hex_digest, 4);
             writeln!(&mut file, "\t{label}:\t{grouped}")?;
         }
@@ -88,7 +89,7 @@ fn load_oldstyle(path: &Path) -> AppResult<DirHasherResult> {
         }
 
         if let Some((algorithm, hex_digest)) = parse_oldstyle_digest_line(&line) {
-            digest_result.add_digest(&algorithm, &hex_digest);
+            digest_result.add_digest(algorithm, &hex_digest);
         }
     }
 
@@ -99,29 +100,53 @@ fn load_oldstyle(path: &Path) -> AppResult<DirHasherResult> {
     Ok(result)
 }
 
-fn parse_oldstyle_digest_line(line: &str) -> Option<(String, String)> {
+fn parse_oldstyle_digest_line(line: &str) -> Option<(Algorithm, String)> {
     let trimmed = line.trim();
     let (prefix, rest) = trimmed.split_once(':')?;
-    let algorithm = match prefix.to_ascii_uppercase().as_str() {
-        "MD5" => "md5",
-        "SHA" | "SHA-1" => "sha-1",
-        "SHA256" | "SHA-256" => "sha-256",
-        _ => return None,
-    };
+    let algorithm = Algorithm::from_oldstyle_prefix(prefix)?;
 
     let hex_digest: String = rest.chars().filter(|ch| ch.is_ascii_hexdigit()).collect();
     if hex_digest.is_empty() {
         None
     } else {
-        Some((algorithm.to_string(), hex_digest.to_ascii_lowercase()))
+        Some((algorithm, hex_digest.to_ascii_lowercase()))
     }
 }
 
-fn oldstyle_label(algorithm: &str) -> String {
-    match algorithm {
-        "md5" => "MD5".to_string(),
-        "sha-1" => "SHA-1".to_string(),
-        "sha-256" => "SHA-256".to_string(),
-        _ => algorithm.to_ascii_uppercase(),
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use tempfile::TempDir;
+
+    use crate::algorithm::Algorithm;
+    use crate::style::PersistenceStyle;
+
+    use super::load_result;
+
+    #[test]
+    fn load_oldstyle_parses_known_hash_lines() {
+        let temp = TempDir::new().expect("temp directory should be created");
+        let file_path = temp.path().join("oldstyle.txt");
+
+        let data = "Generated with: test\nexample.txt\n\tMD5:\t9001 5098 3cd2 4fb0 d696 3f7d 28e1 7f72\n\tSHA-1:\ta999 3e36 4706 816a ba3e 2571 7850 c26c 9cd0 d89d\n";
+        fs::write(&file_path, data).expect("fixture file should be written");
+
+        let result = load_result(&file_path, PersistenceStyle::OldStyle)
+            .expect("old-style file should parse correctly");
+
+        let digest = result
+            .content
+            .get("example.txt")
+            .expect("example.txt should be present");
+
+        assert_eq!(
+            digest.digests.get(&Algorithm::Md5).map(String::as_str),
+            Some("900150983cd24fb0d6963f7d28e17f72")
+        );
+        assert_eq!(
+            digest.digests.get(&Algorithm::Sha1).map(String::as_str),
+            Some("a9993e364706816aba3e25717850c26c9cd0d89d")
+        );
     }
 }

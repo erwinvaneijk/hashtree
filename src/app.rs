@@ -5,6 +5,7 @@ use std::process::ExitCode;
 
 use chrono::Local;
 
+use crate::algorithm::Algorithm;
 use crate::cli::Cli;
 use crate::error::{AppError, AppResult};
 use crate::hashing::{generate_digests, hash_file};
@@ -30,7 +31,7 @@ pub fn run(cli: Cli) -> ExitCode {
 
     let mut algorithms = selected_algorithms(&cli);
     if algorithms.is_empty() {
-        algorithms.push(DEFAULT_ALGORITHM.to_string());
+        algorithms.push(Algorithm::from_name(DEFAULT_ALGORITHM));
     }
 
     let status = if cli.input.is_some() && cli.output.is_some() {
@@ -61,26 +62,26 @@ pub fn run(cli: Cli) -> ExitCode {
     status
 }
 
-fn selected_algorithms(cli: &Cli) -> Vec<String> {
+fn selected_algorithms(cli: &Cli) -> Vec<Algorithm> {
     let mut names = BTreeSet::new();
 
     if cli.all || cli.sha256 {
-        names.insert("sha-256".to_string());
+        names.insert(Algorithm::Sha256);
     }
     if cli.all || cli.sha1 {
-        names.insert("sha-1".to_string());
+        names.insert(Algorithm::Sha1);
     }
     if cli.all || cli.sha384 {
-        names.insert("sha-384".to_string());
+        names.insert(Algorithm::Sha384);
     }
     if cli.all || cli.sha512 {
-        names.insert("sha-512".to_string());
+        names.insert(Algorithm::Sha512);
     }
     if cli.all || cli.md5 {
-        names.insert("md5".to_string());
+        names.insert(Algorithm::Md5);
     }
     if cli.all || cli.md2 {
-        names.insert("md2".to_string());
+        names.insert(Algorithm::Md2);
     }
 
     names.into_iter().collect()
@@ -89,7 +90,7 @@ fn selected_algorithms(cli: &Cli) -> Vec<String> {
 fn write_mode(
     cli: &Cli,
     style: PersistenceStyle,
-    algorithms: &[String],
+    algorithms: &[Algorithm],
     output_file: &Path,
 ) -> AppResult<()> {
     if matches!(style, PersistenceStyle::Xml) {
@@ -107,7 +108,7 @@ fn write_mode(
         .content
         .values()
         .next()
-        .map(|digest| digest.algorithms())
+        .map(|digest| digest.algorithms_enum())
         .unwrap_or_else(|| algorithms.to_vec());
 
     let output_hash =
@@ -131,7 +132,7 @@ fn write_mode(
 fn verify_mode(
     cli: &Cli,
     style: PersistenceStyle,
-    algorithms: &[String],
+    algorithms: &[Algorithm],
     input_file: &Path,
 ) -> AppResult<()> {
     if matches!(style, PersistenceStyle::Xml) {
@@ -187,4 +188,63 @@ fn verify_mode(
     print_missing_entries(&listed_missing, &mut out)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use crate::algorithm::Algorithm;
+    use crate::cli::Cli;
+
+    use super::selected_algorithms;
+
+    fn base_cli() -> Cli {
+        Cli {
+            sha1: false,
+            sha256: false,
+            sha384: false,
+            sha512: false,
+            md5: false,
+            md2: false,
+            all: false,
+            ignore_case: false,
+            verbose: false,
+            force: false,
+            single: false,
+            output: None,
+            input: None,
+            style: "json".to_string(),
+            paths: vec![PathBuf::from(".")],
+        }
+    }
+
+    #[test]
+    fn selected_algorithms_returns_expected_set() {
+        let mut cli = base_cli();
+        cli.sha256 = true;
+        cli.md5 = true;
+
+        let algorithms = selected_algorithms(&cli);
+        assert_eq!(algorithms, vec![Algorithm::Md5, Algorithm::Sha256]);
+    }
+
+    #[test]
+    fn selected_algorithms_all_includes_all_supported() {
+        let mut cli = base_cli();
+        cli.all = true;
+
+        let algorithms = selected_algorithms(&cli);
+        assert_eq!(
+            algorithms,
+            vec![
+                Algorithm::Md2,
+                Algorithm::Md5,
+                Algorithm::Sha1,
+                Algorithm::Sha256,
+                Algorithm::Sha384,
+                Algorithm::Sha512,
+            ]
+        );
+    }
 }
