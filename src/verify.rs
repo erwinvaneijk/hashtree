@@ -131,13 +131,7 @@ pub fn index_result(result: &DirHasherResult, ignore_case: bool) -> IndexedResul
 }
 
 pub fn normalized_path_string(path: &Path, ignore_case: bool) -> String {
-    let normalized = match std::fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_symlink() => absolute_path(path).clean(),
-        Ok(_) => path
-            .canonicalize()
-            .unwrap_or_else(|_| absolute_path(path).clean()),
-        Err(_) => absolute_path(path).clean(),
-    };
+    let normalized = absolute_path(path).clean();
 
     let value = normalized.to_string_lossy().to_string();
     if ignore_case {

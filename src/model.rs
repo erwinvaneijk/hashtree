@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use chrono::Local;
 use serde::de::Error as _;
@@ -49,19 +49,18 @@ impl DigestResult {
     }
 
     pub fn matches(&self, other: &Self) -> bool {
-        let common: Vec<&Algorithm> = self
-            .digests
-            .keys()
-            .filter(|name| other.digests.contains_key(*name))
-            .collect();
+        let mut found_common = false;
 
-        if common.is_empty() {
-            return false;
+        for (algorithm, digest) in &self.digests {
+            if let Some(other_digest) = other.digests.get(algorithm) {
+                found_common = true;
+                if digest != other_digest {
+                    return false;
+                }
+            }
         }
 
-        common
-            .into_iter()
-            .all(|algorithm| self.digests.get(algorithm) == other.digests.get(algorithm))
+        found_common
     }
 
     pub fn equals_subset_of(&self, other: &Self) -> bool {
@@ -113,7 +112,7 @@ impl<'de> Deserialize<'de> for DigestResult {
 pub struct DirHasherResult {
     #[serde(rename = "constructionInfo")]
     pub construction_info: ConstructionInfo,
-    pub content: BTreeMap<String, DigestResult>,
+    pub content: HashMap<String, DigestResult>,
 }
 
 #[derive(Debug, Clone)]
@@ -122,4 +121,4 @@ pub struct IndexedEntry {
     pub digests: DigestResult,
 }
 
-pub type IndexedResult = BTreeMap<String, IndexedEntry>;
+pub type IndexedResult = HashMap<String, IndexedEntry>;

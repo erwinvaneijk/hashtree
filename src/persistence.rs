@@ -45,7 +45,10 @@ fn persist_oldstyle(path: &Path, result: &DirHasherResult) -> AppResult<()> {
         Local::now().to_rfc2822()
     )?;
 
-    for (file_path, digest_result) in &result.content {
+    let mut entries: Vec<_> = result.content.iter().collect();
+    entries.sort_by(|left, right| left.0.cmp(right.0));
+
+    for (file_path, digest_result) in entries {
         writeln!(&mut file, "{file_path}")?;
         for (algorithm, hex_digest) in &digest_result.digests {
             let label = algorithm.oldstyle_label();

@@ -25,7 +25,10 @@ pub fn print_digest_entry(
 
 pub fn pretty_print_result(result: &DirHasherResult, out: &mut dyn Write) -> io::Result<()> {
     writeln!(out, "{} elements", result.content.len())?;
-    for (path, digest_result) in &result.content {
+    let mut entries: Vec<_> = result.content.iter().collect();
+    entries.sort_by(|left, right| left.0.cmp(right.0));
+
+    for (path, digest_result) in entries {
         writeln!(out, "\t{path}")?;
         for (algorithm, hex_digest) in &digest_result.digests {
             let mut line = String::new();
