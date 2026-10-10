@@ -14,11 +14,16 @@ pub fn persist_result(
     path: &Path,
     style: PersistenceStyle,
     result: &DirHasherResult,
+    pretty_json: bool,
 ) -> AppResult<()> {
     match style {
         PersistenceStyle::Json => {
             let file = File::create(path)?;
-            serde_json::to_writer_pretty(file, result)?;
+            if pretty_json {
+                serde_json::to_writer_pretty(file, result)?;
+            } else {
+                serde_json::to_writer(file, result)?;
+            }
             Ok(())
         }
         PersistenceStyle::OldStyle => persist_oldstyle(path, result),

@@ -30,6 +30,9 @@ pub struct CreateArgs {
 
     #[arg(short = 'o', long = "output")]
     pub output: PathBuf,
+
+    #[arg(long = "compact-json")]
+    pub compact_json: bool,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -54,6 +57,9 @@ pub struct CommonArgs {
 
     #[arg(long = "single")]
     pub single: bool,
+
+    #[arg(long = "jobs", value_parser = clap::value_parser!(usize))]
+    pub jobs: Option<usize>,
 
     #[arg(short = 's', long = "style", default_value = "json")]
     pub style: String,

@@ -47,6 +47,7 @@ Common options for both subcommands:
 -a, --all
 -v, --verbose
     --single
+    --jobs <N>
 -s, --style <STYLE>    (json|old|xml)
 ```
 
@@ -55,6 +56,7 @@ Create-specific options:
 ```text
 -o, --output <OUTPUT>
 -f, --force
+    --compact-json
 ```
 
 Verify-specific options:

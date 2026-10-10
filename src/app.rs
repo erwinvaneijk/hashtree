@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use chrono::Local;
+use rayon::ThreadPoolBuilder;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use walkdir::WalkDir;
@@ -30,6 +31,7 @@ struct SharedCommandOptions {
     algorithms: Vec<Algorithm>,
     verbose: bool,
     single: bool,
+    jobs: Option<usize>,
     paths: Vec<PathBuf>,
 }
 
@@ -38,6 +40,7 @@ struct CreateCommand {
     shared: SharedCommandOptions,
     output: PathBuf,
     force: bool,
+    compact_json: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +70,7 @@ fn resolve_create(args: CreateArgs) -> AppResult<CreateCommand> {
         shared: resolve_common(args.common)?,
         output: args.output,
         force: args.force,
+        compact_json: args.compact_json,
     })
 }
 
@@ -79,6 +83,12 @@ fn resolve_verify(args: VerifyArgs) -> AppResult<VerifyCommand> {
 }
 
 fn resolve_common(common: CommonArgs) -> AppResult<SharedCommandOptions> {
+    if let Some(0) = common.jobs {
+        return Err(AppError::Message(
+            "--jobs must be greater than zero".to_string(),
+        ));
+    }
+
     let mut algorithms = selected_algorithms(&common.algorithm_selection);
     if algorithms.is_empty() {
         algorithms.push(Algorithm::from_name(DEFAULT_ALGORITHM));
@@ -89,6 +99,7 @@ fn resolve_common(common: CommonArgs) -> AppResult<SharedCommandOptions> {
         algorithms,
         verbose: common.verbose,
         single: common.single,
+        jobs: common.jobs,
         paths: common.paths,
     })
 }
@@ -164,9 +175,15 @@ fn write_mode(command: &CreateCommand) -> AppResult<()> {
         &command.shared.paths,
         &command.shared.algorithms,
         !command.shared.single,
+        command.shared.jobs,
         command.shared.verbose,
     )?;
-    persist_result(&command.output, command.shared.style, &digests)?;
+    persist_result(
+        &command.output,
+        command.shared.style,
+        &digests,
+        !command.compact_json,
+    )?;
 
     let summary_algorithms = digests
         .content
@@ -206,6 +223,7 @@ fn verify_mode(command: &VerifyCommand) -> AppResult<()> {
         &command.shared.paths,
         &command.shared.algorithms,
         !command.shared.single,
+        command.shared.jobs,
         command.shared.verbose,
         command.ignore_case,
         &verification_index,
@@ -304,6 +322,7 @@ fn evaluate_verification(
     paths: &[PathBuf],
     algorithms: &[Algorithm],
     multi_threaded: bool,
+    jobs: Option<usize>,
     verbose: bool,
     ignore_case: bool,
     verification_index: &crate::verify::IndexedRefResult<'_>,
@@ -341,27 +360,39 @@ fn evaluate_verification(
 
         if metadata.file_type().is_dir() {
             if multi_threaded {
-                let evaluations = WalkDir::new(root_path)
-                    .follow_links(false)
-                    .into_iter()
-                    .filter_map(Result::ok)
-                    .filter(|entry| entry.file_type().is_file())
-                    .par_bridge()
-                    .map_init(
-                        || vec![0_u8; crate::BLOCK_READ_SIZE],
-                        |buffer, entry| {
-                            evaluate_one_file(
-                                entry.path(),
-                                algorithms,
-                                buffer,
-                                ignore_case,
-                                verification_index,
-                                verbose,
-                            )
-                        },
-                    )
-                    .filter_map(|entry| entry)
-                    .collect::<Vec<_>>();
+                let evaluate_parallel = || {
+                    WalkDir::new(root_path)
+                        .follow_links(false)
+                        .into_iter()
+                        .filter_map(Result::ok)
+                        .filter(|entry| entry.file_type().is_file())
+                        .par_bridge()
+                        .map_init(
+                            || vec![0_u8; crate::BLOCK_READ_SIZE],
+                            |buffer, entry| {
+                                evaluate_one_file(
+                                    entry.path(),
+                                    algorithms,
+                                    buffer,
+                                    ignore_case,
+                                    verification_index,
+                                    verbose,
+                                )
+                            },
+                        )
+                        .filter_map(|entry| entry)
+                        .collect::<Vec<_>>()
+                };
+
+                let evaluations = if let Some(job_count) = jobs {
+                    ThreadPoolBuilder::new()
+                        .num_threads(job_count)
+                        .build()
+                        .map_err(|error| AppError::Message(error.to_string()))?
+                        .install(evaluate_parallel)
+                } else {
+                    evaluate_parallel()
+                };
 
                 for evaluation in evaluations {
                     apply_file_evaluation(&mut verify_eval, evaluation);

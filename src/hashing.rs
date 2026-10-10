@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use digest::Digest as _;
 use md2::Md2;
 use md5::Md5;
+use rayon::ThreadPoolBuilder;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use sha1::Sha1;
@@ -20,6 +21,7 @@ pub fn generate_digests(
     paths: &[PathBuf],
     algorithms: &[Algorithm],
     multi_threaded: bool,
+    jobs: Option<usize>,
     verbose: bool,
 ) -> AppResult<DirHasherResult> {
     let mut result = DirHasherResult::default();
@@ -41,32 +43,47 @@ pub fn generate_digests(
 
         if metadata.file_type().is_dir() {
             if multi_threaded {
-                let digest_pairs: Vec<(String, DigestResult)> = WalkDir::new(path)
-                    .follow_links(false)
-                    .into_iter()
-                    .filter_map(Result::ok)
-                    .filter(|entry| entry.file_type().is_file())
-                    .par_bridge()
-                    .map_init(
-                        || vec![0_u8; BLOCK_READ_SIZE],
-                        |buffer, entry| match hash_file_with_buffer(
-                            entry.path(),
-                            algorithms,
-                            buffer,
-                        ) {
-                            Ok(digest) => {
-                                Some((entry.path().to_string_lossy().to_string(), digest))
-                            }
-                            Err(error) => {
-                                if verbose {
-                                    eprintln!("Could not hash {}: {error}", entry.path().display());
+                let run_parallel = || {
+                    WalkDir::new(path)
+                        .follow_links(false)
+                        .into_iter()
+                        .filter_map(Result::ok)
+                        .filter(|entry| entry.file_type().is_file())
+                        .par_bridge()
+                        .map_init(
+                            || vec![0_u8; BLOCK_READ_SIZE],
+                            |buffer, entry| match hash_file_with_buffer(
+                                entry.path(),
+                                algorithms,
+                                buffer,
+                            ) {
+                                Ok(digest) => {
+                                    Some((entry.path().to_string_lossy().to_string(), digest))
                                 }
-                                None
-                            }
-                        },
-                    )
-                    .filter_map(|entry| entry)
-                    .collect();
+                                Err(error) => {
+                                    if verbose {
+                                        eprintln!(
+                                            "Could not hash {}: {error}",
+                                            entry.path().display()
+                                        );
+                                    }
+                                    None
+                                }
+                            },
+                        )
+                        .filter_map(|entry| entry)
+                        .collect::<Vec<_>>()
+                };
+
+                let digest_pairs = if let Some(job_count) = jobs {
+                    ThreadPoolBuilder::new()
+                        .num_threads(job_count)
+                        .build()
+                        .map_err(|error| AppError::Message(error.to_string()))?
+                        .install(run_parallel)
+                } else {
+                    run_parallel()
+                };
 
                 for (file_path, digest) in digest_pairs {
                     result.content.insert(file_path, digest);

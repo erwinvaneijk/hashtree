@@ -191,6 +191,34 @@ fn output_file_requires_force_overwrite() {
         .success();
 }
 
+#[test]
+fn create_supports_jobs_and_compact_json() {
+    let (temp, tree_dir) = copy_fixture_tree();
+    let output_manifest = temp.path().join("hashes-compact.json");
+
+    Command::cargo_bin("hashtree")
+        .expect("binary should build")
+        .arg("create")
+        .arg("-o")
+        .arg(&output_manifest)
+        .arg("--sha-256")
+        .arg("--jobs")
+        .arg("2")
+        .arg("--compact-json")
+        .arg(&tree_dir)
+        .assert()
+        .success();
+
+    let raw = fs::read_to_string(&output_manifest).expect("manifest should be readable");
+    assert!(
+        !raw.contains("\n  \"constructionInfo\""),
+        "compact json should not be pretty-printed"
+    );
+
+    let json: Value = serde_json::from_str(&raw).expect("manifest should still be valid json");
+    assert!(json.get("content").is_some(), "content must be present");
+}
+
 fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
