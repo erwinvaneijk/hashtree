@@ -24,36 +24,43 @@ pub fn generate_digests(
     let mut result = DirHasherResult::default();
     let files = collect_files(paths)?;
 
-    let digest_pairs: Vec<(String, DigestResult)> = if multi_threaded {
-        files
+    if multi_threaded {
+        let digest_pairs: Vec<(String, DigestResult)> = files
             .par_iter()
-            .filter_map(|path| match hash_file(path, algorithms) {
-                Ok(digest) => Some((path.to_string_lossy().to_string(), digest)),
-                Err(error) => {
-                    if verbose {
-                        eprintln!("Could not hash {}: {error}", path.display());
+            .map_init(
+                || vec![0_u8; BLOCK_READ_SIZE],
+                |buffer, path| match hash_file_with_buffer(path, algorithms, buffer) {
+                    Ok(digest) => Some((path.to_string_lossy().to_string(), digest)),
+                    Err(error) => {
+                        if verbose {
+                            eprintln!("Could not hash {}: {error}", path.display());
+                        }
+                        None
                     }
-                    None
-                }
-            })
-            .collect()
-    } else {
-        files
-            .iter()
-            .filter_map(|path| match hash_file(path, algorithms) {
-                Ok(digest) => Some((path.to_string_lossy().to_string(), digest)),
-                Err(error) => {
-                    if verbose {
-                        eprintln!("Could not hash {}: {error}", path.display());
-                    }
-                    None
-                }
-            })
-            .collect()
-    };
+                },
+            )
+            .filter_map(|entry| entry)
+            .collect();
 
-    for (path, digest) in digest_pairs {
-        result.content.insert(path, digest);
+        for (path, digest) in digest_pairs {
+            result.content.insert(path, digest);
+        }
+    } else {
+        let mut buffer = vec![0_u8; BLOCK_READ_SIZE];
+        for path in files {
+            match hash_file_with_buffer(&path, algorithms, &mut buffer) {
+                Ok(digest) => {
+                    result
+                        .content
+                        .insert(path.to_string_lossy().to_string(), digest);
+                }
+                Err(error) => {
+                    if verbose {
+                        eprintln!("Could not hash {}: {error}", path.display());
+                    }
+                }
+            }
+        }
     }
 
     Ok(result)
@@ -63,27 +70,26 @@ pub fn collect_files(paths: &[PathBuf]) -> AppResult<Vec<PathBuf>> {
     let mut files = Vec::new();
 
     for path in paths {
-        if !path.exists() {
-            return Err(AppError::FileDoesNotExist(path.clone()));
-        }
+        let metadata =
+            fs::symlink_metadata(path).map_err(|_| AppError::FileDoesNotExist(path.clone()))?;
 
-        if is_symlink(path) {
+        if metadata.file_type().is_symlink() {
             continue;
         }
 
-        if path.is_file() {
+        if metadata.file_type().is_file() {
             files.push(path.clone());
             continue;
         }
 
-        if path.is_dir() {
+        if metadata.file_type().is_dir() {
             for entry in WalkDir::new(path).follow_links(false) {
                 let entry = match entry {
                     Ok(value) => value,
                     Err(_) => continue,
                 };
 
-                if is_symlink(entry.path()) {
+                if entry.file_type().is_symlink() {
                     continue;
                 }
 
@@ -104,15 +110,23 @@ pub fn is_symlink(path: &Path) -> bool {
 }
 
 pub fn hash_file(path: &Path, algorithms: &[Algorithm]) -> io::Result<DigestResult> {
+    let mut buffer = vec![0_u8; BLOCK_READ_SIZE];
+    hash_file_with_buffer(path, algorithms, &mut buffer)
+}
+
+pub fn hash_file_with_buffer(
+    path: &Path,
+    algorithms: &[Algorithm],
+    buffer: &mut [u8],
+) -> io::Result<DigestResult> {
     let mut file = File::open(path)?;
     let mut hashers: Vec<(Algorithm, AnyHasher)> = algorithms
         .iter()
         .filter_map(|algorithm| create_hasher(algorithm).map(|hasher| (algorithm.clone(), hasher)))
         .collect();
 
-    let mut buffer = vec![0_u8; BLOCK_READ_SIZE];
     loop {
-        let read = file.read(&mut buffer)?;
+        let read = file.read(buffer)?;
         if read == 0 {
             break;
         }
