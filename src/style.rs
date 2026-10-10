@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use crate::error::{AppError, AppResult};
 
 #[derive(Debug, Clone, Copy)]

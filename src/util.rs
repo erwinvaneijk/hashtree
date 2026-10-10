@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use std::path::{Path, PathBuf};
 
 pub fn split_hex(input: &str, group_size: usize) -> String {

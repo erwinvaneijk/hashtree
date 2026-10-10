@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use assert_cmd::Command;
 use predicates::prelude::*;
 use serde_json::Value;

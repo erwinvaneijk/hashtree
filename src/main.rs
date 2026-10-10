@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use clap::Parser;
 
 use hashtree_rs::app;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::fs;

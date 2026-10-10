@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 pub mod algorithm;
 pub mod app;
 pub mod cli;
@@ -12,4 +13,4 @@ pub mod verify;
 
 pub const BLOCK_READ_SIZE: usize = 1024 * 1024;
 pub const DEFAULT_ALGORITHM: &str = "sha-256";
-pub const VERSION: &str = "1.2-rust";
+pub const VERSION: &str = "1.0.0";

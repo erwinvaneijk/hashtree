@@ -2,6 +2,8 @@
 
 A Rust reimplementation of the `jHashtools` workflow from `../jHashtools`.
 
+Current stable release: **1.0.0**
+
 It supports:
 - Recursive file hashing for files/directories
 - Multiple digest algorithms (`sha-1`, `sha-256`, `sha-384`, `sha-512`, `md5`, `md2`)
@@ -67,3 +69,8 @@ Verify-specific options:
 ```
 
 `xml` is recognized for compatibility but intentionally not implemented (matching `jHashtools`).
+
+## License
+
+This project is licensed under the **European Union Public Licence v1.2 (EUPL-1.2)**.
+See [LICENSE](./LICENSE).

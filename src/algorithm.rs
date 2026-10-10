@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

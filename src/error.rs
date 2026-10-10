@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use std::io;
 use std::path::PathBuf;
 

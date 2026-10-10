@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use std::fmt::Write as _;
 use std::io::{self, Write};
 

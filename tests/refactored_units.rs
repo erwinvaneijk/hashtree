@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 use std::fs;
 
 use hashtree_rs::algorithm::Algorithm;
