@@ -1,18 +1,21 @@
 use std::collections::BTreeSet;
 use std::collections::HashSet;
+use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use chrono::Local;
+use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
+use walkdir::WalkDir;
 
 use crate::algorithm::Algorithm;
 use crate::cli::{
     AlgorithmSelection, Cli, Command as CliCommand, CommonArgs, CreateArgs, VerifyArgs,
 };
 use crate::error::{AppError, AppResult};
-use crate::hashing::{collect_files, generate_digests, hash_file, hash_file_with_buffer};
+use crate::hashing::{generate_digests, hash_file, hash_file_with_buffer};
 use crate::model::DirHasherResult;
 use crate::persistence::{load_result, persist_result};
 use crate::report::{pretty_print_result, print_digest_entry};
@@ -305,74 +308,114 @@ fn evaluate_verification(
     ignore_case: bool,
     verification_index: &crate::verify::IndexedRefResult<'_>,
 ) -> AppResult<VerifyEval> {
-    let files = collect_files(paths)?;
+    let mut verify_eval = VerifyEval {
+        measured_not_matching_count: 0,
+        first_measured_difference_path: None,
+        verification_match_keys: HashSet::with_capacity(verification_index.len()),
+        verification_subset_keys: HashSet::with_capacity(verification_index.len()),
+        seen_missing_entries: Vec::new(),
+    };
 
-    let file_evaluations = if multi_threaded {
-        files
-            .par_iter()
-            .map_init(
-                || vec![0_u8; crate::BLOCK_READ_SIZE],
-                |buffer, path| {
-                    evaluate_one_file(
-                        path,
+    for root_path in paths {
+        let metadata = fs::symlink_metadata(root_path)
+            .map_err(|_| AppError::FileDoesNotExist(root_path.clone()))?;
+
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
+
+        if metadata.file_type().is_file() {
+            let mut buffer = vec![0_u8; crate::BLOCK_READ_SIZE];
+            if let Some(evaluation) = evaluate_one_file(
+                root_path,
+                algorithms,
+                &mut buffer,
+                ignore_case,
+                verification_index,
+                verbose,
+            ) {
+                apply_file_evaluation(&mut verify_eval, evaluation);
+            }
+            continue;
+        }
+
+        if metadata.file_type().is_dir() {
+            if multi_threaded {
+                let evaluations = WalkDir::new(root_path)
+                    .follow_links(false)
+                    .into_iter()
+                    .filter_map(Result::ok)
+                    .filter(|entry| entry.file_type().is_file())
+                    .par_bridge()
+                    .map_init(
+                        || vec![0_u8; crate::BLOCK_READ_SIZE],
+                        |buffer, entry| {
+                            evaluate_one_file(
+                                entry.path(),
+                                algorithms,
+                                buffer,
+                                ignore_case,
+                                verification_index,
+                                verbose,
+                            )
+                        },
+                    )
+                    .filter_map(|entry| entry)
+                    .collect::<Vec<_>>();
+
+                for evaluation in evaluations {
+                    apply_file_evaluation(&mut verify_eval, evaluation);
+                }
+            } else {
+                let mut buffer = vec![0_u8; crate::BLOCK_READ_SIZE];
+                for entry in WalkDir::new(root_path).follow_links(false) {
+                    let entry = match entry {
+                        Ok(value) => value,
+                        Err(_) => continue,
+                    };
+
+                    if !entry.file_type().is_file() {
+                        continue;
+                    }
+
+                    if let Some(evaluation) = evaluate_one_file(
+                        entry.path(),
                         algorithms,
-                        buffer,
+                        &mut buffer,
                         ignore_case,
                         verification_index,
                         verbose,
-                    )
-                },
-            )
-            .filter_map(|entry| entry)
-            .collect::<Vec<_>>()
-    } else {
-        let mut buffer = vec![0_u8; crate::BLOCK_READ_SIZE];
-        files
-            .iter()
-            .filter_map(|path| {
-                evaluate_one_file(
-                    path,
-                    algorithms,
-                    &mut buffer,
-                    ignore_case,
-                    verification_index,
-                    verbose,
-                )
-            })
-            .collect::<Vec<_>>()
-    };
-
-    let mut verification_match_keys = HashSet::with_capacity(file_evaluations.len());
-    let mut verification_subset_keys = HashSet::with_capacity(file_evaluations.len());
-    let mut measured_not_matching_count = 0;
-    let mut first_measured_difference_path = None;
-    let mut seen_missing_entries = Vec::new();
-
-    for evaluation in file_evaluations {
-        if evaluation.verification_matches {
-            verification_match_keys.insert(evaluation.key.clone());
-        }
-        if evaluation.verification_subset {
-            verification_subset_keys.insert(evaluation.key.clone());
-        }
-        if let Some(path) = evaluation.measured_difference_path {
-            measured_not_matching_count += 1;
-            if first_measured_difference_path.is_none() {
-                first_measured_difference_path = Some(path);
+                    ) {
+                        apply_file_evaluation(&mut verify_eval, evaluation);
+                    }
+                }
             }
-        }
-        if let Some(entry) = evaluation.seen_missing_entry {
-            seen_missing_entries.push(entry);
         }
     }
 
-    Ok(VerifyEval {
-        measured_not_matching_count,
-        first_measured_difference_path,
-        verification_match_keys,
-        verification_subset_keys,
-        seen_missing_entries,
-    })
+    Ok(verify_eval)
+}
+
+fn apply_file_evaluation(verify_eval: &mut VerifyEval, evaluation: FileEvaluation) {
+    if evaluation.verification_matches {
+        verify_eval
+            .verification_match_keys
+            .insert(evaluation.key.clone());
+    }
+    if evaluation.verification_subset {
+        verify_eval
+            .verification_subset_keys
+            .insert(evaluation.key.clone());
+    }
+    if let Some(path) = evaluation.measured_difference_path {
+        verify_eval.measured_not_matching_count += 1;
+        if verify_eval.first_measured_difference_path.is_none() {
+            verify_eval.first_measured_difference_path = Some(path);
+        }
+    }
+    if let Some(entry) = evaluation.seen_missing_entry {
+        verify_eval.seen_missing_entries.push(entry);
+    }
 }
 
 struct FileEvaluation {

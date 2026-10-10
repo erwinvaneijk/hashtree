@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use digest::Digest as _;
 use md2::Md2;
 use md5::Md5;
+use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use sha1::Sha1;
 use sha2::{Sha256, Sha384, Sha512};
@@ -22,41 +23,77 @@ pub fn generate_digests(
     verbose: bool,
 ) -> AppResult<DirHasherResult> {
     let mut result = DirHasherResult::default();
-    let files = collect_files(paths)?;
 
-    if multi_threaded {
-        let digest_pairs: Vec<(String, DigestResult)> = files
-            .par_iter()
-            .map_init(
-                || vec![0_u8; BLOCK_READ_SIZE],
-                |buffer, path| match hash_file_with_buffer(path, algorithms, buffer) {
-                    Ok(digest) => Some((path.to_string_lossy().to_string(), digest)),
-                    Err(error) => {
-                        if verbose {
-                            eprintln!("Could not hash {}: {error}", path.display());
-                        }
-                        None
-                    }
-                },
-            )
-            .filter_map(|entry| entry)
-            .collect();
+    for path in paths {
+        let metadata =
+            fs::symlink_metadata(path).map_err(|_| AppError::FileDoesNotExist(path.clone()))?;
 
-        for (path, digest) in digest_pairs {
-            result.content.insert(path, digest);
+        if metadata.file_type().is_symlink() {
+            continue;
         }
-    } else {
-        let mut buffer = vec![0_u8; BLOCK_READ_SIZE];
-        for path in files {
-            match hash_file_with_buffer(&path, algorithms, &mut buffer) {
-                Ok(digest) => {
-                    result
-                        .content
-                        .insert(path.to_string_lossy().to_string(), digest);
+
+        if metadata.file_type().is_file() {
+            if let Some((file_path, digest)) = hash_one_path(path, algorithms, verbose) {
+                result.content.insert(file_path, digest);
+            }
+            continue;
+        }
+
+        if metadata.file_type().is_dir() {
+            if multi_threaded {
+                let digest_pairs: Vec<(String, DigestResult)> = WalkDir::new(path)
+                    .follow_links(false)
+                    .into_iter()
+                    .filter_map(Result::ok)
+                    .filter(|entry| entry.file_type().is_file())
+                    .par_bridge()
+                    .map_init(
+                        || vec![0_u8; BLOCK_READ_SIZE],
+                        |buffer, entry| match hash_file_with_buffer(
+                            entry.path(),
+                            algorithms,
+                            buffer,
+                        ) {
+                            Ok(digest) => {
+                                Some((entry.path().to_string_lossy().to_string(), digest))
+                            }
+                            Err(error) => {
+                                if verbose {
+                                    eprintln!("Could not hash {}: {error}", entry.path().display());
+                                }
+                                None
+                            }
+                        },
+                    )
+                    .filter_map(|entry| entry)
+                    .collect();
+
+                for (file_path, digest) in digest_pairs {
+                    result.content.insert(file_path, digest);
                 }
-                Err(error) => {
-                    if verbose {
-                        eprintln!("Could not hash {}: {error}", path.display());
+            } else {
+                let mut buffer = vec![0_u8; BLOCK_READ_SIZE];
+                for entry in WalkDir::new(path).follow_links(false) {
+                    let entry = match entry {
+                        Ok(value) => value,
+                        Err(_) => continue,
+                    };
+
+                    if !entry.file_type().is_file() {
+                        continue;
+                    }
+
+                    match hash_file_with_buffer(entry.path(), algorithms, &mut buffer) {
+                        Ok(digest) => {
+                            result
+                                .content
+                                .insert(entry.path().to_string_lossy().to_string(), digest);
+                        }
+                        Err(error) => {
+                            if verbose {
+                                eprintln!("Could not hash {}: {error}", entry.path().display());
+                            }
+                        }
                     }
                 }
             }
@@ -64,6 +101,23 @@ pub fn generate_digests(
     }
 
     Ok(result)
+}
+
+fn hash_one_path(
+    path: &Path,
+    algorithms: &[Algorithm],
+    verbose: bool,
+) -> Option<(String, DigestResult)> {
+    let mut buffer = vec![0_u8; BLOCK_READ_SIZE];
+    match hash_file_with_buffer(path, algorithms, &mut buffer) {
+        Ok(digest) => Some((path.to_string_lossy().to_string(), digest)),
+        Err(error) => {
+            if verbose {
+                eprintln!("Could not hash {}: {error}", path.display());
+            }
+            None
+        }
+    }
 }
 
 pub fn collect_files(paths: &[PathBuf]) -> AppResult<Vec<PathBuf>> {
