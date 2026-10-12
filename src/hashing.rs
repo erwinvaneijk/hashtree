@@ -4,6 +4,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use digest::Digest as _;
+use filetime::FileTime;
 use md2::Md2;
 use md5::Md5;
 use rayon::ThreadPoolBuilder;
@@ -18,6 +19,28 @@ use crate::BLOCK_READ_SIZE;
 use crate::algorithm::Algorithm;
 use crate::error::{AppError, AppResult};
 use crate::model::{DigestResult, DirHasherResult};
+
+/// Represents the access and modification times of a file for preservation.
+struct FileTimesPreserver {
+    accessed: FileTime,
+    modified: FileTime,
+}
+
+impl FileTimesPreserver {
+    /// Captures the current MAC (modification/access) times of a file.
+    fn capture(path: &Path) -> io::Result<Self> {
+        let metadata = fs::metadata(path)?;
+        Ok(FileTimesPreserver {
+            accessed: FileTime::from_last_access_time(&metadata),
+            modified: FileTime::from_last_modification_time(&metadata),
+        })
+    }
+
+    /// Restores the captured MAC times to the file.
+    fn restore(self, path: &Path) -> io::Result<()> {
+        filetime::set_file_times(path, self.accessed, self.modified)
+    }
+}
 
 pub fn generate_digests(
     paths: &[PathBuf],
@@ -192,6 +215,9 @@ pub fn hash_file_with_buffer(
     algorithms: &[Algorithm],
     buffer: &mut [u8],
 ) -> io::Result<DigestResult> {
+    // Capture the file times before opening to preserve forensic integrity
+    let times_preserver = FileTimesPreserver::capture(path)?;
+
     let mut file = File::open(path)?;
     let mut hashers: Vec<(Algorithm, AnyHasher)> = algorithms
         .iter()
@@ -213,6 +239,9 @@ pub fn hash_file_with_buffer(
     for (algorithm, hasher) in hashers {
         result.add_digest(algorithm, &hasher.finalize_hex());
     }
+
+    // Restore the original file times
+    times_preserver.restore(path)?;
 
     Ok(result)
 }
