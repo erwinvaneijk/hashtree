@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
 use assert_cmd::Command;
+use predicates::str::contains;
 use std::fs;
 use tempfile::TempDir;
 
@@ -215,4 +216,159 @@ fn case_output_contains_investigative_action() {
         has_action,
         "graph should contain investigation:InvestigativeAction"
     );
+}
+
+#[test]
+fn verify_case_format_passes_for_unchanged_files() {
+    let temp = TempDir::new().expect("temp directory should be created");
+    let output_file = temp.path().join("hashes.jsonld");
+    let test_file = temp.path().join("test.txt");
+
+    fs::write(&test_file, "test content").expect("test file should be written");
+
+    // Create CASE manifest
+    let mut create_cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    create_cmd
+        .arg("create")
+        .arg("--sha-256")
+        .arg("--style")
+        .arg("case")
+        .arg("-o")
+        .arg(&output_file)
+        .arg("-f")
+        .arg(&test_file);
+
+    create_cmd.assert().success();
+
+    // Verify against CASE manifest
+    let mut verify_cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    verify_cmd
+        .arg("verify")
+        .arg("--input")
+        .arg(&output_file)
+        .arg("--style")
+        .arg("case")
+        .arg("--sha-256")
+        .arg(&test_file);
+
+    verify_cmd.assert().success();
+}
+
+#[test]
+fn verify_case_format_detects_modified_files() {
+    let temp = TempDir::new().expect("temp directory should be created");
+    let output_file = temp.path().join("hashes.jsonld");
+    let test_file = temp.path().join("test.txt");
+
+    fs::write(&test_file, "test content").expect("test file should be written");
+
+    // Create CASE manifest
+    let mut create_cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    create_cmd
+        .arg("create")
+        .arg("--sha-256")
+        .arg("--style")
+        .arg("case")
+        .arg("-o")
+        .arg(&output_file)
+        .arg("-f")
+        .arg(&test_file);
+
+    create_cmd.assert().success();
+
+    // Modify file
+    fs::write(&test_file, "modified content").expect("test file should be modified");
+
+    // Verify against CASE manifest - should report differences
+    let mut verify_cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    verify_cmd
+        .arg("verify")
+        .arg("--input")
+        .arg(&output_file)
+        .arg("--style")
+        .arg("case")
+        .arg("--sha-256")
+        .arg(&test_file);
+
+    verify_cmd
+        .assert()
+        .success()
+        .stdout(contains("There are differences"));
+}
+
+#[test]
+fn verify_case_format_with_multiple_files() {
+    let temp = TempDir::new().expect("temp directory should be created");
+    let output_file = temp.path().join("hashes.jsonld");
+    let file1 = temp.path().join("file1.txt");
+    let file2 = temp.path().join("file2.txt");
+
+    fs::write(&file1, "content 1").expect("file1 should be written");
+    fs::write(&file2, "content 2").expect("file2 should be written");
+
+    // Create CASE manifest with both files
+    let mut create_cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    create_cmd
+        .arg("create")
+        .arg("--sha-256")
+        .arg("--style")
+        .arg("case")
+        .arg("-o")
+        .arg(&output_file)
+        .arg("-f")
+        .arg(&file1)
+        .arg(&file2);
+
+    create_cmd.assert().success();
+
+    // Verify both files
+    let mut verify_cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    verify_cmd
+        .arg("verify")
+        .arg("--input")
+        .arg(&output_file)
+        .arg("--style")
+        .arg("case")
+        .arg("--sha-256")
+        .arg(&file1)
+        .arg(&file2);
+
+    verify_cmd.assert().success();
+}
+
+#[test]
+fn verify_case_format_with_compact_json() {
+    let temp = TempDir::new().expect("temp directory should be created");
+    let output_file = temp.path().join("hashes.jsonld");
+    let test_file = temp.path().join("test.txt");
+
+    fs::write(&test_file, "test content").expect("test file should be written");
+
+    // Create compact CASE manifest
+    let mut create_cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    create_cmd
+        .arg("create")
+        .arg("--sha-256")
+        .arg("--style")
+        .arg("case")
+        .arg("--compact-json")
+        .arg("-o")
+        .arg(&output_file)
+        .arg("-f")
+        .arg(&test_file);
+
+    create_cmd.assert().success();
+
+    // Verify against compact CASE manifest
+    let mut verify_cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    verify_cmd
+        .arg("verify")
+        .arg("--input")
+        .arg(&output_file)
+        .arg("--style")
+        .arg("case")
+        .arg("--sha-256")
+        .arg(&test_file);
+
+    verify_cmd.assert().success();
 }

@@ -45,7 +45,7 @@ pub fn load_result(path: &Path, style: PersistenceStyle) -> AppResult<DirHasherR
             Ok(serde_json::from_reader(file)?)
         }
         PersistenceStyle::OldStyle => load_oldstyle(path),
-        PersistenceStyle::Case => Err(AppError::CaseLoadNotSupported),
+        PersistenceStyle::Case => case::load_case(path),
         PersistenceStyle::Xml => Err(AppError::XmlNotSupported),
     }
 }
