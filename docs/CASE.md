@@ -139,20 +139,56 @@ jq '.["@graph"][] | select(."@type" == "observable:File") | .["observable:hashes
 - **Interoperability**: Output can be processed by CASE-aware tools
 - **Standards**: Aligns with DFRWS and CDO standards
 
-## Limitations (MVP)
+## Verification
 
-- **Output only**: CASE format is for creating new exports; use `--style json` or `--style old` to load and verify existing manifests
+CASE format files can now be verified to detect tampering or changes:
+
+```bash
+# Create CASE manifest
+hashtree create --sha-256 --style case -o hashes.jsonld files/
+
+# Verify files against CASE manifest
+hashtree verify --input hashes.jsonld --style case --sha-256 files/
+```
+
+### Verification Workflow
+
+1. **Create manifest** with all 9 algorithms for maximum integrity verification:
+   ```bash
+   hashtree create --all --style case -o evidence.jsonld /evidence/
+   ```
+
+2. **Later, verify files** against the manifest:
+   ```bash
+   hashtree verify --input evidence.jsonld --style case --all /evidence/
+   ```
+
+3. **Detect tampering** - the verification will report any hash mismatches:
+   ```
+   *** PASSED VERIFICATION ***
+   # OR
+   There are differences.
+   These entries are seen, but missing in the evidence.jsonld list
+   file.txt
+     sha-256  <new hash>
+   These entries are in the evidence.jsonld list, but not in the directory
+   file.txt
+     sha-256  <original hash>
+   ```
+
+## Limitations
+
 - **No RDF/XML**: JSON-LD format only (RDF/XML export could be added in future versions)
 
 ## Future Enhancements
 
 Planned improvements for future releases:
 
-- Load and verify CASE format outputs
 - CASE schema validation
 - Extended provenance metadata
 - Digital evidence chain tracking
 - RDF/XML export format
+- CASE update/amendment support
 
 ## Examples
 
@@ -165,11 +201,32 @@ hashtree create --all --style case -o digital_evidence.jsonld /mnt/evidence/
 ### Export with verification workflow
 
 ```bash
-# Create manifest
-hashtree create --sha-256 --style case -o hashes.jsonld files/
+# Create manifest with all algorithms
+hashtree create --all --style case -o hashes.jsonld files/
 
-# Later, verify against manifest with JSON format
-hashtree verify --input hashes.jsonld files/
+# Later, verify against CASE manifest with all algorithms
+hashtree verify --input hashes.jsonld --style case --all files/
+```
+
+### Detect file tampering
+
+```bash
+# Create manifest
+hashtree create --sha-256 --style case -o evidence.jsonld /path/to/files/
+
+# Modify a file
+echo "tampered" > /path/to/files/important.txt
+
+# Verify - will report the changes
+hashtree verify --input evidence.jsonld --style case --sha-256 /path/to/files/
+# Output shows:
+# There are differences.
+# These entries are seen, but missing in the evidence.jsonld list
+# /path/to/files/important.txt
+#     sha-256  <new hash>
+# These entries are in the evidence.jsonld list, but not in the directory
+# /path/to/files/important.txt
+#     sha-256  <original hash>
 ```
 
 ### Integrate with analysis tools
