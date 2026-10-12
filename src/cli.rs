@@ -83,6 +83,15 @@ pub struct AlgorithmSelection {
     #[arg(long = "sha-512")]
     pub sha512: bool,
 
+    #[arg(long = "sha3-256")]
+    pub sha3_256: bool,
+
+    #[arg(long = "sha3-384")]
+    pub sha3_384: bool,
+
+    #[arg(long = "sha3-512")]
+    pub sha3_512: bool,
+
     #[arg(long = "md5")]
     pub md5: bool,
 

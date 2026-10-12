@@ -11,6 +11,7 @@ use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use sha1::Sha1;
 use sha2::{Sha256, Sha384, Sha512};
+use sha3::{Sha3_256, Sha3_384, Sha3_512};
 use walkdir::WalkDir;
 
 use crate::BLOCK_READ_SIZE;
@@ -223,6 +224,9 @@ pub enum AnyHasher {
     Sha256(Sha256),
     Sha384(Sha384),
     Sha512(Sha512),
+    Sha3_256(Sha3_256),
+    Sha3_384(Sha3_384),
+    Sha3_512(Sha3_512),
 }
 
 impl AnyHasher {
@@ -234,6 +238,9 @@ impl AnyHasher {
             Self::Sha256(hasher) => hasher.update(data),
             Self::Sha384(hasher) => hasher.update(data),
             Self::Sha512(hasher) => hasher.update(data),
+            Self::Sha3_256(hasher) => hasher.update(data),
+            Self::Sha3_384(hasher) => hasher.update(data),
+            Self::Sha3_512(hasher) => hasher.update(data),
         }
     }
 
@@ -245,6 +252,9 @@ impl AnyHasher {
             Self::Sha256(hasher) => hex::encode(hasher.finalize()),
             Self::Sha384(hasher) => hex::encode(hasher.finalize()),
             Self::Sha512(hasher) => hex::encode(hasher.finalize()),
+            Self::Sha3_256(hasher) => hex::encode(hasher.finalize()),
+            Self::Sha3_384(hasher) => hex::encode(hasher.finalize()),
+            Self::Sha3_512(hasher) => hex::encode(hasher.finalize()),
         }
     }
 }
@@ -257,6 +267,9 @@ pub fn create_hasher(name: &Algorithm) -> Option<AnyHasher> {
         Algorithm::Sha256 => Some(AnyHasher::Sha256(Sha256::new())),
         Algorithm::Sha384 => Some(AnyHasher::Sha384(Sha384::new())),
         Algorithm::Sha512 => Some(AnyHasher::Sha512(Sha512::new())),
+        Algorithm::Sha3_256 => Some(AnyHasher::Sha3_256(Sha3_256::new())),
+        Algorithm::Sha3_384 => Some(AnyHasher::Sha3_384(Sha3_384::new())),
+        Algorithm::Sha3_512 => Some(AnyHasher::Sha3_512(Sha3_512::new())),
         _ => None,
     }
 }

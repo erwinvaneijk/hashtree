@@ -153,6 +153,15 @@ fn selected_algorithms(selection: &AlgorithmSelection) -> Vec<Algorithm> {
     if selection.all || selection.sha512 {
         names.insert(Algorithm::Sha512);
     }
+    if selection.all || selection.sha3_256 {
+        names.insert(Algorithm::Sha3_256);
+    }
+    if selection.all || selection.sha3_384 {
+        names.insert(Algorithm::Sha3_384);
+    }
+    if selection.all || selection.sha3_512 {
+        names.insert(Algorithm::Sha3_512);
+    }
     if selection.all || selection.md5 {
         names.insert(Algorithm::Md5);
     }
@@ -572,6 +581,9 @@ mod tests {
                 Algorithm::Sha256,
                 Algorithm::Sha384,
                 Algorithm::Sha512,
+                Algorithm::Sha3_256,
+                Algorithm::Sha3_384,
+                Algorithm::Sha3_512,
             ]
         );
     }

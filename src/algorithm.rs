@@ -9,6 +9,9 @@ pub enum Algorithm {
     Sha256,
     Sha384,
     Sha512,
+    Sha3_256,
+    Sha3_384,
+    Sha3_512,
     Other(String),
 }
 
@@ -22,6 +25,9 @@ impl Algorithm {
             "sha256" | "sha-256" => Self::Sha256,
             "sha384" | "sha-384" => Self::Sha384,
             "sha512" | "sha-512" => Self::Sha512,
+            "sha3" | "sha3-256" | "sha3256" => Self::Sha3_256,
+            "sha3-384" | "sha3384" => Self::Sha3_384,
+            "sha3-512" | "sha3512" => Self::Sha3_512,
             _ => Self::Other(normalized),
         }
     }
@@ -43,6 +49,9 @@ impl Algorithm {
             Self::Md2 => "MD2".to_string(),
             Self::Sha384 => "SHA-384".to_string(),
             Self::Sha512 => "SHA-512".to_string(),
+            Self::Sha3_256 => "SHA3-256".to_string(),
+            Self::Sha3_384 => "SHA3-384".to_string(),
+            Self::Sha3_512 => "SHA3-512".to_string(),
             Self::Other(value) => value.to_ascii_uppercase(),
         }
     }
@@ -61,6 +70,9 @@ impl fmt::Display for Algorithm {
             Self::Sha256 => write!(f, "sha-256"),
             Self::Sha384 => write!(f, "sha-384"),
             Self::Sha512 => write!(f, "sha-512"),
+            Self::Sha3_256 => write!(f, "sha3-256"),
+            Self::Sha3_384 => write!(f, "sha3-384"),
+            Self::Sha3_512 => write!(f, "sha3-512"),
             Self::Other(value) => write!(f, "{value}"),
         }
     }
