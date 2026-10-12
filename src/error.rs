@@ -17,6 +17,11 @@ pub enum AppError {
     #[error("XML is not yet supported.")]
     XmlNotSupported,
 
+    #[error(
+        "CASE format is output-only in this version. Use --style json or --style old to load results."
+    )]
+    CaseLoadNotSupported,
+
     #[error("File {0} does not exist")]
     FileDoesNotExist(PathBuf),
 
