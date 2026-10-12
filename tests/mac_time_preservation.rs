@@ -127,7 +127,7 @@ fn generate_digests_preserves_file_times_in_directory() {
     set_file_times_to_past(&file2, 5);
     set_file_times_to_past(&file3, 10);
 
-    let times_before = vec![
+    let times_before = [
         get_file_times(&file1),
         get_file_times(&file2),
         get_file_times(&file3),
@@ -144,7 +144,7 @@ fn generate_digests_preserves_file_times_in_directory() {
     .expect("generate_digests should succeed");
 
     // Verify all file times are preserved
-    let times_after = vec![
+    let times_after = [
         get_file_times(&file1),
         get_file_times(&file2),
         get_file_times(&file3),
@@ -176,7 +176,7 @@ fn generate_digests_preserves_file_times_multithreaded() {
     set_file_times_to_past(&file3, 21);
     set_file_times_to_past(&file4, 30);
 
-    let times_before = vec![
+    let times_before = [
         get_file_times(&file1),
         get_file_times(&file2),
         get_file_times(&file3),
@@ -194,7 +194,7 @@ fn generate_digests_preserves_file_times_multithreaded() {
     .expect("generate_digests should succeed");
 
     // Verify all file times are preserved even with parallel processing
-    let times_after = vec![
+    let times_after = [
         get_file_times(&file1),
         get_file_times(&file2),
         get_file_times(&file3),
