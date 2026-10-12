@@ -1,0 +1,86 @@
+{
+  "@context": {
+    "action": "https://ontology.caseontology.org/action/",
+    "core": "https://ontology.caseontology.org/core/",
+    "identity": "https://ontology.caseontology.org/identity/",
+    "investigation": "https://ontology.caseontology.org/investigation/",
+    "observable": "https://ontology.caseontology.org/observable/",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "tool": "https://ontology.caseontology.org/tool/",
+    "types": "https://ontology.caseontology.org/types/"
+  },
+  "@graph": [
+    {
+      "@id": "case:tool-hashtree-1",
+      "@type": "tool:AnalyticTool",
+      "tool:name": "hashtree",
+      "tool:toolType": "hash-calculator",
+      "tool:version": "1.0.0"
+    },
+    {
+      "@id": "case:identity-operator",
+      "@type": "identity:Person",
+      "core:name": "forensic_examiner"
+    },
+    {
+      "@id": "case:file-1",
+      "@type": "observable:File",
+      "observable:fileName": "evidence.bin",
+      "observable:filePath": "/evidence/device01/evidence.bin",
+      "observable:hashes": [
+        {
+          "types:hashMethod": "MD5",
+          "types:hashValue": "5d41402abc4b2a76b9719d911017c592"
+        },
+        {
+          "types:hashMethod": "SHA-256",
+          "types:hashValue": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "types:hashMethod": "SHA-512",
+          "types:hashValue": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+        }
+      ]
+    },
+    {
+      "@id": "case:file-2",
+      "@type": "observable:File",
+      "observable:fileName": "system32.dll",
+      "observable:filePath": "/evidence/device01/Windows/System32/system32.dll",
+      "observable:hashes": [
+        {
+          "types:hashMethod": "MD5",
+          "types:hashValue": "098f6bcd4621d373cade4e832627b4f6"
+        },
+        {
+          "types:hashMethod": "SHA-256",
+          "types:hashValue": "6b86b273f403eb22c4f27d00695369f5a325b2e7d0d7c0cd5e3e1e0e5c9f1e5d"
+        }
+      ]
+    },
+    {
+      "@id": "case:action-hash-1",
+      "@type": "investigation:InvestigativeAction",
+      "action:instrument": {
+        "@id": "case:tool-hashtree-1"
+      },
+      "action:result": {
+        "@id": "case:bundle-results"
+      },
+      "action:startTime": "2026-10-12T14:30:00.000+0200",
+      "investigation:performer": "case:identity-operator"
+    },
+    {
+      "@id": "case:bundle-results",
+      "@type": "core:Bundle",
+      "core:hasFacet": [
+        {
+          "@id": "case:file-1"
+        },
+        {
+          "@id": "case:file-2"
+        }
+      ]
+    }
+  ]
+}

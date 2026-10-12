@@ -7,7 +7,10 @@ Current stable release: **1.0.0**
 It supports:
 - Recursive file hashing for files/directories
 - Multiple digest algorithms (`sha-1`, `sha-256`, `sha-384`, `sha-512`, `md5`, `md2`)
-- Writing digest manifests (`json` and `old` style)
+- Writing digest manifests in multiple formats:
+  - `json` - Machine-readable JSON format
+  - `old` - Legacy text format
+  - `case` - CASE JSON-LD format (forensically-compliant, standards-based)
 - Verifying current files against a stored manifest
 - Case-insensitive path matching during verification (`--ignorecase`)
 
@@ -20,8 +23,11 @@ cargo build --release
 ## Usage
 
 ```bash
-# Create digest manifest
+# Create digest manifest in JSON format
 cargo run -- create -o hashes.json --sha-256 /path/to/dir
+
+# Create manifest in CASE JSON-LD format (forensic-compliant)
+cargo run -- create -o hashes.jsonld --sha-256 --style case /path/to/dir
 
 # Verify against manifest
 cargo run -- verify -i hashes.json --sha-256 /path/to/dir
@@ -50,7 +56,7 @@ Common options for both subcommands:
 -v, --verbose
     --single
     --jobs <N>
--s, --style <STYLE>    (json|old|xml)
+-s, --style <STYLE>    (json|old|case|xml)
 ```
 
 Create-specific options:
@@ -69,6 +75,22 @@ Verify-specific options:
 ```
 
 `xml` is recognized for compatibility but intentionally not implemented (matching `jHashtools`).
+
+## CASE Ontology Support
+
+Hashtree now supports exporting file hashes in **CASE JSON-LD format**, enabling forensically-compliant output that integrates with cyber-investigation tools and standards.
+
+### Quick Start
+
+```bash
+# Export as CASE JSON-LD
+hashtree create --sha-256 --style case -o evidence.jsonld /path/to/files
+
+# With all algorithms
+hashtree create --all --style case -o digital_evidence.jsonld /mnt/evidence/
+```
+
+See [docs/CASE.md](./docs/CASE.md) for detailed information, validation examples, and the CASE JSON-LD structure.
 
 ## License
 
