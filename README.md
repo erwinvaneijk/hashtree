@@ -1,6 +1,7 @@
 # hashtree (Rust)
 
-A Rust reimplementation of the `jHashtools` workflow from [https://github.com/erwinvaneijk/jHashtools/].
+A Rust reimplementation of the [`jHashtools`](https://github.com/erwinvaneijk/jHashtools/)
+workflow.
 
 Current stable release: **1.0.0**
 
