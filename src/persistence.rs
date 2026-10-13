@@ -6,6 +6,7 @@ use std::path::Path;
 use chrono::Local;
 
 use crate::algorithm::Algorithm;
+use crate::case;
 use crate::error::{AppError, AppResult};
 use crate::model::{DigestResult, DirHasherResult};
 use crate::style::PersistenceStyle;
@@ -28,6 +29,11 @@ pub fn persist_result(
             Ok(())
         }
         PersistenceStyle::OldStyle => persist_oldstyle(path, result),
+        PersistenceStyle::Case => {
+            let case_bundle = case::convert_to_case(result)?;
+            case::serialize_case(path, &case_bundle, pretty_json)?;
+            Ok(())
+        }
         PersistenceStyle::Xml => Err(AppError::XmlNotSupported),
     }
 }
@@ -39,6 +45,7 @@ pub fn load_result(path: &Path, style: PersistenceStyle) -> AppResult<DirHasherR
             Ok(serde_json::from_reader(file)?)
         }
         PersistenceStyle::OldStyle => load_oldstyle(path),
+        PersistenceStyle::Case => case::load_case(path),
         PersistenceStyle::Xml => Err(AppError::XmlNotSupported),
     }
 }

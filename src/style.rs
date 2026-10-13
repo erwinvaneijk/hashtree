@@ -6,6 +6,7 @@ pub enum PersistenceStyle {
     Json,
     OldStyle,
     Xml,
+    Case,
 }
 
 impl PersistenceStyle {
@@ -14,6 +15,7 @@ impl PersistenceStyle {
             "json" => Ok(Self::Json),
             "old" => Ok(Self::OldStyle),
             "xml" => Ok(Self::Xml),
+            "case" | "case-json-ld" => Ok(Self::Case),
             _ => Err(AppError::UnsupportedStyleOption(value.to_string())),
         }
     }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 pub mod algorithm;
 pub mod app;
+pub mod case;
 pub mod cli;
 pub mod error;
 pub mod hashing;
