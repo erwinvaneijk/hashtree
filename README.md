@@ -1,16 +1,18 @@
 # hashtree (Rust)
 
-A Rust reimplementation of the `jHashtools` workflow from `../jHashtools`.
+A Rust reimplementation of the `jHashtools` workflow from [https://github.com/erwinvaneijk/jHashtools/].
 
 Current stable release: **1.0.0**
 
 It supports:
+
 - Recursive file hashing for files/directories
-- Multiple digest algorithms (9 total: `md2`, `md5`, `sha-1`, `sha-256`, `sha-384`, `sha-512`, `sha3-256`, `sha3-384`, `sha3-512`)
+- Multiple digest algorithms (9 total: `md2`, `md5`, `sha-1`, `sha-256`,
+  `sha-384`, `sha-512`, `sha3-256`, `sha3-384`, `sha3-512`)
 - Writing digest manifests in multiple formats:
   - `json` - Machine-readable JSON format
   - `old` - Legacy text format
-  - `case` - CASE JSON-LD format (forensically-compliant, standards-based, with verification support)
+  - `case` - CASE JSON-LD format (forensically-compliant, standards-based)
 - Verifying current files against a stored manifest
 - Detecting file tampering across all algorithms
 - Case-insensitive path matching during verification (`--ignorecase`)
@@ -33,7 +35,7 @@ cargo run -- create -o hashes.jsonld --sha-256 --style case /path/to/dir
 # Verify against manifest (any format)
 cargo run -- verify -i hashes.json --sha-256 /path/to/dir
 
-# Verify CASE manifest (detects tampering)
+# Verify CASE manifest
 cargo run -- verify -i hashes.jsonld --style case --sha-256 /path/to/dir
 
 # Use old legacy format
@@ -78,11 +80,11 @@ Verify-specific options:
 -n, --ignorecase
 ```
 
-`xml` is recognized for compatibility but intentionally not implemented (matching `jHashtools`).
-
 ## CASE Ontology Support
 
-Hashtree now supports exporting and verifying file hashes in **CASE JSON-LD format**, enabling forensically-compliant output that integrates with cyber-investigation tools and standards.
+Hashtree now supports exporting and verifying file hashes in **CASE JSON-LD
+format**, enabling forensically-compliant output that integrates with
+cyber-investigation tools and standards.
 
 ### Quick Start
 
@@ -110,7 +112,8 @@ hashtree verify --input evidence_manifest.jsonld --style case --all /mnt/evidenc
 # Output shows which files changed and which algorithms detected the difference
 ```
 
-See [docs/CASE.md](./docs/CASE.md) for detailed information, validation examples, verification workflows, and the complete CASE JSON-LD structure.
+See [docs/CASE.md](./docs/CASE.md) for detailed information, validation examples,
+verification workflows, and the complete CASE JSON-LD structure.
 
 ## License
 
