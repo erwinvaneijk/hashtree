@@ -59,6 +59,18 @@ impl Algorithm {
     pub fn is_supported(&self) -> bool {
         !matches!(self, Self::Other(_))
     }
+
+    /// Length of the digest in bytes, or `None` for an unknown algorithm.
+    pub fn digest_length_bytes(&self) -> Option<usize> {
+        match self {
+            Self::Md2 | Self::Md5 => Some(16),
+            Self::Sha1 => Some(20),
+            Self::Sha256 | Self::Sha3_256 => Some(32),
+            Self::Sha384 | Self::Sha3_384 => Some(48),
+            Self::Sha512 | Self::Sha3_512 => Some(64),
+            Self::Other(_) => None,
+        }
+    }
 }
 
 impl fmt::Display for Algorithm {
@@ -94,6 +106,16 @@ mod tests {
         let algorithm = Algorithm::from_name("whirlpool");
         assert_eq!(algorithm.to_string(), "whirlpool");
         assert!(!algorithm.is_supported());
+        assert_eq!(algorithm.digest_length_bytes(), None);
+    }
+
+    #[test]
+    fn digest_lengths_match_the_algorithms() {
+        assert_eq!(Algorithm::Md5.digest_length_bytes(), Some(16));
+        assert_eq!(Algorithm::Sha1.digest_length_bytes(), Some(20));
+        assert_eq!(Algorithm::Sha256.digest_length_bytes(), Some(32));
+        assert_eq!(Algorithm::Sha3_384.digest_length_bytes(), Some(48));
+        assert_eq!(Algorithm::Sha512.digest_length_bytes(), Some(64));
     }
 
     #[test]

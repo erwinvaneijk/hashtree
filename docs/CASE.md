@@ -35,6 +35,17 @@ hashtree create --all --style case -o evidence.jsonld ./evidence_files/
 hashtree create --sha-256 --style case --compact-json -o hashes.jsonld files/
 ```
 
+### Base64 Hash Values
+
+```bash
+hashtree create --sha-256 --style case --base64 -o hashes.jsonld files/
+```
+
+With `--base64`, `types:hashValue` holds the base64 encoding of the digest for
+algorithms of at least 256 bits (SHA-256 and longer); shorter digests such as
+MD5 and SHA-1 remain hexadecimal. Verification accepts both encodings, so a
+base64 manifest can be verified without passing `--base64`.
+
 ## Output Structure
 
 CASE output follows the JSON-LD format with `@context` and `@graph` fields:
@@ -57,7 +68,7 @@ CASE output follows the JSON-LD format with `@context` and `@graph` fields:
       "@id": "case:tool-hashtree-1",
       "@type": "tool:AnalyticTool",
       "tool:name": "hashtree",
-      "tool:version": "1.0.0",
+      "tool:version": "1.1.0",
       "tool:toolType": "hash-calculator"
     },
     // Operator/performer
@@ -109,7 +120,7 @@ The output includes these key CASE objects:
 | `tool:AnalyticTool` | Tool description | Documents hashtree version and capabilities |
 | `identity:Person` | Operator info | Records who performed the hashing |
 | `observable:File` | File metadata | Contains file path and hashes |
-| `types:Hash` | Hash values | Algorithm and hexadecimal digest |
+| `types:Hash` | Hash values | Algorithm and digest value (hexadecimal, or base64 with `--base64`) |
 | `investigation:InvestigativeAction` | Action metadata | Documents when and how hashing was performed |
 | `core:Bundle` | Results wrapper | Groups all objects together |
 

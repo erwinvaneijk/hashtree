@@ -3,12 +3,12 @@ use std::collections::{BTreeMap, HashMap};
 
 use chrono::Local;
 use serde::de::Error as _;
-use serde::ser::SerializeSeq;
+use serde::ser::{SerializeMap, SerializeSeq, SerializeStruct};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::VERSION;
 use crate::algorithm::Algorithm;
-use crate::util::normalize_hex;
+use crate::encoding::{DigestEncoding, decode_digest};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,13 +40,15 @@ pub struct DigestResult {
 }
 
 impl DigestResult {
-    pub fn add_digest(&mut self, algorithm: Algorithm, hex_digest: &str) {
-        let hex_digest = normalize_hex(hex_digest);
+    /// Add a digest value that is either hexadecimal or base64 encoded; it is
+    /// stored as canonical lowercase hexadecimal.
+    pub fn add_digest(&mut self, algorithm: Algorithm, digest: &str) {
+        let hex_digest = decode_digest(&algorithm, digest);
         self.digests.insert(algorithm, hex_digest);
     }
 
-    pub fn add_digest_name(&mut self, algorithm: &str, hex_digest: &str) {
-        self.add_digest(Algorithm::from_name(algorithm), hex_digest);
+    pub fn add_digest_name(&mut self, algorithm: &str, digest: &str) {
+        self.add_digest(Algorithm::from_name(algorithm), digest);
     }
 
     pub fn matches(&self, other: &Self) -> bool {
@@ -84,9 +86,33 @@ impl Serialize for DigestResult {
     where
         S: Serializer,
     {
-        let mut seq = serializer.serialize_seq(Some(self.digests.len()))?;
-        for (algorithm, hex_digest) in &self.digests {
-            seq.serialize_element(&format!("{algorithm}:{hex_digest}"))?;
+        EncodedDigestResult::new(self, DigestEncoding::Hex).serialize(serializer)
+    }
+}
+
+/// Serializable view on a [`DigestResult`] that renders its digests in a
+/// specific encoding.
+pub struct EncodedDigestResult<'a> {
+    digests: &'a DigestResult,
+    encoding: DigestEncoding,
+}
+
+impl<'a> EncodedDigestResult<'a> {
+    pub fn new(digests: &'a DigestResult, encoding: DigestEncoding) -> Self {
+        Self { digests, encoding }
+    }
+}
+
+impl Serialize for EncodedDigestResult<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let digests = &self.digests.digests;
+        let mut seq = serializer.serialize_seq(Some(digests.len()))?;
+        for (algorithm, hex_digest) in digests {
+            let digest = self.encoding.render(hex_digest);
+            seq.serialize_element(&format!("{algorithm}:{digest}"))?;
         }
         seq.end()
     }
@@ -114,6 +140,55 @@ pub struct DirHasherResult {
     #[serde(rename = "constructionInfo")]
     pub construction_info: ConstructionInfo,
     pub content: HashMap<String, DigestResult>,
+}
+
+/// Serializable view on a [`DirHasherResult`] that renders its digests in a
+/// specific encoding.
+pub struct EncodedDirHasherResult<'a> {
+    result: &'a DirHasherResult,
+    encoding: DigestEncoding,
+}
+
+impl<'a> EncodedDirHasherResult<'a> {
+    pub fn new(result: &'a DirHasherResult, encoding: DigestEncoding) -> Self {
+        Self { result, encoding }
+    }
+}
+
+impl Serialize for EncodedDirHasherResult<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("DirHasherResult", 2)?;
+        state.serialize_field("constructionInfo", &self.result.construction_info)?;
+        state.serialize_field(
+            "content",
+            &EncodedContent {
+                content: &self.result.content,
+                encoding: self.encoding,
+            },
+        )?;
+        state.end()
+    }
+}
+
+struct EncodedContent<'a> {
+    content: &'a HashMap<String, DigestResult>,
+    encoding: DigestEncoding,
+}
+
+impl Serialize for EncodedContent<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.content.len()))?;
+        for (path, digests) in self.content {
+            map.serialize_entry(path, &EncodedDigestResult::new(digests, self.encoding))?;
+        }
+        map.end()
+    }
 }
 
 #[derive(Debug, Clone)]

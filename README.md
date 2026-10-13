@@ -3,7 +3,7 @@
 A Rust reimplementation of the [`jHashtools`](https://github.com/erwinvaneijk/jHashtools/)
 workflow.
 
-Current stable release: **1.0.0**
+Current stable release: **1.1.0**
 
 It supports:
 
@@ -14,6 +14,8 @@ It supports:
   - `json` - Machine-readable JSON format
   - `old` - Legacy text format
   - `case` - CASE JSON-LD format (forensically-compliant, standards-based)
+- Digest output in hexadecimal or, for digests of at least 256 bits, base64
+  (`--base64`)
 - Verifying current files against a stored manifest
 - Detecting file tampering across all algorithms
 - Case-insensitive path matching during verification (`--ignorecase`)
@@ -41,6 +43,9 @@ cargo run -- verify -i hashes.jsonld --style case --sha-256 /path/to/dir
 
 # Use old legacy format
 cargo run -- create -o hashes.txt -s old --all /path/to/dir
+
+# Write digests of 256 bits and longer in base64
+cargo run -- create -o hashes.json --base64 --sha-256 /path/to/dir
 ```
 
 ## CLI structure
@@ -60,11 +65,38 @@ Common options for both subcommands:
     --md5
     --md2
 -a, --all
+-b, --base64
 -v, --verbose
     --single
     --jobs <N>
 -s, --style <STYLE>    (json|old|case|xml)
 ```
+
+## Base64 digests
+
+By default every digest is written as lowercase hexadecimal. With `--base64`,
+digests of at least 256 bits (`sha-256`, `sha-384`, `sha-512`, `sha3-256`,
+`sha3-384` and `sha3-512`) are written in standard base64 instead. Shorter
+digests (`md2`, `md5`, `sha-1`) stay hexadecimal, because base64 buys little
+there and would only make the manifest harder to compare with other tools.
+
+The encoding is a presentation choice only; it applies to all styles (`json`,
+`old` and `case`) as well as to the reports printed on the console:
+
+```bash
+# Create a manifest with base64 digests
+hashtree create -o hashes.json --base64 --sha-256 /path/to/dir
+
+# Verification auto-detects the encoding, so --base64 is not required here
+hashtree verify -i hashes.json --sha-256 /path/to/dir
+
+# ... but it does control how digests are printed in the verification report
+hashtree verify -i hashes.json --base64 --sha-256 /path/to/dir
+```
+
+Manifests may even mix both encodings: every digest value is decoded
+individually, and both padded and unpadded base64 (standard or URL-safe
+alphabet) are accepted.
 
 Create-specific options:
 

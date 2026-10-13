@@ -16,6 +16,7 @@ use crate::algorithm::Algorithm;
 use crate::cli::{
     AlgorithmSelection, Cli, Command as CliCommand, CommonArgs, CreateArgs, VerifyArgs,
 };
+use crate::encoding::DigestEncoding;
 use crate::error::{AppError, AppResult};
 use crate::hashing::{generate_digests, hash_file, hash_file_with_buffer};
 use crate::model::DirHasherResult;
@@ -30,6 +31,7 @@ use crate::{DEFAULT_ALGORITHM, VERSION};
 struct SharedCommandOptions {
     style: PersistenceStyle,
     algorithms: Vec<Algorithm>,
+    encoding: DigestEncoding,
     verbose: bool,
     single: bool,
     jobs: Option<usize>,
@@ -98,6 +100,7 @@ fn resolve_common(common: CommonArgs) -> AppResult<SharedCommandOptions> {
     Ok(SharedCommandOptions {
         style: PersistenceStyle::parse(&common.style)?,
         algorithms,
+        encoding: DigestEncoding::from_base64_flag(common.base64),
         verbose: common.verbose,
         single: common.single,
         jobs: common.jobs,
@@ -193,6 +196,7 @@ fn write_mode(command: &CreateCommand) -> AppResult<()> {
         command.shared.style,
         &digests,
         !command.compact_json,
+        command.shared.encoding,
     )?;
 
     let summary_algorithms = digests
@@ -216,7 +220,7 @@ fn write_mode(command: &CreateCommand) -> AppResult<()> {
     let username = std::env::var("USER").unwrap_or_else(|_| "unknown".to_string());
     let mut stderr = io::stderr().lock();
     writeln!(&mut stderr, "Generated with hashtree (rust) by {username}")?;
-    pretty_print_result(&summary, &mut stderr)?;
+    pretty_print_result(&summary, &mut stderr, command.shared.encoding)?;
 
     Ok(())
 }
@@ -265,13 +269,13 @@ fn verify_mode(command: &VerifyCommand) -> AppResult<()> {
         if let Some((single_path, single_digests)) = verify_eval.single_printable_entry_for(&path) {
             let mut single = DirHasherResult::default();
             single.content.insert(single_path, single_digests);
-            pretty_print_result(&single, &mut out)?;
+            pretty_print_result(&single, &mut out, command.shared.encoding)?;
         } else if let Some(entry) = verification_index.values().find(|entry| entry.path == path) {
             let mut single = DirHasherResult::default();
             single
                 .content
                 .insert(entry.path.to_string(), entry.digests.clone());
-            pretty_print_result(&single, &mut out)?;
+            pretty_print_result(&single, &mut out, command.shared.encoding)?;
         }
         return Ok(());
     }
@@ -286,7 +290,7 @@ fn verify_mode(command: &VerifyCommand) -> AppResult<()> {
     let mut seen_missing_entries = verify_eval.seen_missing_entries;
     seen_missing_entries.sort_by(|left, right| left.0.cmp(&right.0));
     for (path, digests) in seen_missing_entries {
-        print_digest_entry(&path, &digests, &mut out)?;
+        print_digest_entry(&path, &digests, &mut out, command.shared.encoding)?;
     }
 
     writeln!(
@@ -301,7 +305,7 @@ fn verify_mode(command: &VerifyCommand) -> AppResult<()> {
     listed_missing_paths.sort();
     for key in listed_missing_paths {
         if let Some(entry) = verification_index.get(key) {
-            print_digest_entry(entry.path, entry.digests, &mut out)?;
+            print_digest_entry(entry.path, entry.digests, &mut out, command.shared.encoding)?;
         }
     }
 

@@ -5,6 +5,7 @@
 
 use std::time::SystemTime;
 
+use crate::encoding::DigestEncoding;
 use crate::error::AppResult;
 use crate::model::DirHasherResult;
 
@@ -14,8 +15,12 @@ use super::serializer::{
     serialize_action, serialize_bundle, serialize_file, serialize_person, serialize_tool,
 };
 
-/// Convert a DirHasherResult to a CASE Bundle
-pub fn convert_to_case(result: &DirHasherResult) -> AppResult<CaseBundle> {
+/// Convert a DirHasherResult to a CASE Bundle, rendering the digests in the
+/// requested encoding
+pub fn convert_to_case(
+    result: &DirHasherResult,
+    encoding: DigestEncoding,
+) -> AppResult<CaseBundle> {
     let mut bundle = CaseBundle::new();
 
     // Get current user for performer
@@ -54,7 +59,7 @@ pub fn convert_to_case(result: &DirHasherResult) -> AppResult<CaseBundle> {
 
         // Add hashes
         for (algorithm, hex_digest) in &digest_result.digests {
-            let hash = CaseHash::new(algorithm.oldstyle_label(), hex_digest.clone());
+            let hash = CaseHash::new(algorithm.oldstyle_label(), encoding.render(hex_digest));
             case_file.hashes.push(hash);
         }
 
@@ -90,7 +95,7 @@ mod tests {
         digests.add_digest(Algorithm::Sha256, "abc123");
         result.content.insert("test.txt".to_string(), digests);
 
-        let bundle = convert_to_case(&result)?;
+        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
 
         // Should have: tool, person, file, action, bundle
         assert_eq!(bundle.graph.len(), 5);
@@ -101,7 +106,7 @@ mod tests {
     #[test]
     fn convert_to_case_includes_tool_object() -> AppResult<()> {
         let result = DirHasherResult::default();
-        let bundle = convert_to_case(&result)?;
+        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
 
         let tool_found = bundle
             .graph
@@ -115,7 +120,7 @@ mod tests {
     #[test]
     fn convert_to_case_includes_person_object() -> AppResult<()> {
         let result = DirHasherResult::default();
-        let bundle = convert_to_case(&result)?;
+        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
 
         let person_found = bundle
             .graph
@@ -136,7 +141,7 @@ mod tests {
             .insert("file1.txt".to_string(), digests.clone());
         result.content.insert("file2.txt".to_string(), digests);
 
-        let bundle = convert_to_case(&result)?;
+        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
 
         let file_count = bundle
             .graph
@@ -151,7 +156,7 @@ mod tests {
     #[test]
     fn convert_to_case_includes_action_object() -> AppResult<()> {
         let result = DirHasherResult::default();
-        let bundle = convert_to_case(&result)?;
+        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
 
         let action_found = bundle.graph.iter().any(|obj| {
             obj.get("@type").and_then(|t| t.as_str()) == Some("investigation:InvestigativeAction")
@@ -164,7 +169,7 @@ mod tests {
     #[test]
     fn convert_to_case_includes_bundle_object() -> AppResult<()> {
         let result = DirHasherResult::default();
-        let bundle = convert_to_case(&result)?;
+        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
 
         let bundle_found = bundle
             .graph
@@ -172,6 +177,26 @@ mod tests {
             .any(|obj| obj.get("@type").and_then(|t| t.as_str()) == Some("core:Bundle"));
 
         assert!(bundle_found, "Bundle object should be present");
+        Ok(())
+    }
+
+    #[test]
+    fn convert_to_case_renders_long_digests_in_base64() -> AppResult<()> {
+        let hex_digest = "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e";
+        let base64_digest = "pZGm1Av0IEBKARczz7exkNYsZb8LzaMrV7J32a2fFG4=";
+
+        let mut result = DirHasherResult::default();
+        let mut digests = DigestResult::default();
+        digests.add_digest(Algorithm::Sha256, hex_digest);
+        result.content.insert("test.txt".to_string(), digests);
+
+        let bundle = convert_to_case(&result, DigestEncoding::Base64)?;
+        let serialized = serde_json::to_string(&bundle.graph)?;
+
+        assert!(
+            serialized.contains(base64_digest),
+            "CASE output should contain the base64 digest"
+        );
         Ok(())
     }
 }

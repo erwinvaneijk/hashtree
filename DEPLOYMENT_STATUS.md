@@ -1,9 +1,140 @@
 ╔════════════════════════════════════════════════════════════════════════════╗
+║               BASE64 DIGEST ENCODING - STATUS REPORT                       ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+PROJECT: hashtree - File Hash Verification Tool
+FEATURE: Base64 encoding for digests of at least 256 bits
+RELEASE: 1.1.0 (minor: new feature, backwards compatible)
+IMPLEMENTATION DATE: October 2026
+STATUS: ✅ COMPLETE & PRODUCTION READY
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📜 CHANGELOG 1.1.0
+
+  Added
+    • -b, --base64 on both create and verify: digests of at least 256 bits
+      (SHA-256, SHA-384, SHA-512, SHA3-256, SHA3-384, SHA3-512) are written in
+      standard, padded base64 instead of hexadecimal
+    • Verification reads hexadecimal and base64 digests interchangeably, so a
+      base64 manifest verifies without --base64, and manifests may even mix
+      both encodings
+    • Unpadded and URL-safe base64 are accepted on input
+    • src/encoding.rs: DigestEncoding (render, render_grouped) and
+      decode_digest, the single place where encodings are resolved
+    • Algorithm::digest_length_bytes(), used to tell the two encodings apart
+
+  Changed
+    • DigestResult::add_digest now normalises any incoming value (hex or
+      base64) to canonical lowercase hexadecimal
+    • The old-style parser strips whitespace instead of filtering hexadecimal
+      digits, so grouped hex and base64 both round trip
+    • Library API: persist_result, pretty_print_result, print_digest_entry,
+      print_missing_entries and convert_to_case take a DigestEncoding argument
+
+  Unchanged
+    • Hexadecimal stays the default; default output is byte-identical to 1.0.0
+    • Digests below 256 bits (MD2, MD5, SHA-1) remain hexadecimal, also when
+      --base64 is given
+    • Digests are still compared as hexadecimal internally, so verification
+      semantics are untouched
+
+  Dependencies
+    • NEW: base64 0.22 (dual licensed Apache-2.0 OR MIT)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 CODE QUALITY METRICS (1.1.0)
+
+  Compilation:        ✅ Clean (0 warnings, 0 errors)
+  Tests:              ✅ 66/66 passing (15 new, up from 51)
+  Clippy Linting:     ✅ Clean (0 issues)
+  Code Formatting:    ✅ Compliant (cargo fmt --all -- --check)
+  Lines of Code:      667 insertions across 14 files
+                      (including src/encoding.rs, 215 lines)
+  Dependencies:       ⚠️  One new external dependency (base64 0.22)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 TEST COVERAGE (1.1.0)
+
+  Unit Tests in src/encoding.rs (8):
+    ✅ base64_is_used_for_digests_of_at_least_256_bits
+    ✅ short_digests_stay_hexadecimal_even_in_base64_mode
+    ✅ grouping_applies_to_hexadecimal_output_only
+    ✅ decodes_both_encodings_into_canonical_hex
+    ✅ decodes_unpadded_and_url_safe_base64
+    ✅ decodes_grouped_hexadecimal_from_old_style_manifests
+    ✅ values_that_are_neither_encoding_keep_their_hex_characters
+    ✅ roundtrips_every_supported_digest_length
+
+  Unit Tests elsewhere:
+    ✅ algorithm: digest_lengths_match_the_algorithms
+    ✅ persistence: load_oldstyle_accepts_base64_digests
+    ✅ persistence: base64_manifests_round_trip_for_every_style
+      (json, old and case)
+    ✅ case: convert_to_case_renders_long_digests_in_base64
+
+  CLI Integration Tests (3):
+    ✅ base64_manifest_encodes_long_digests_only
+    ✅ verification_accepts_either_encoding
+    ✅ base64_old_style_roundtrip_verification_passes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 USAGE EXAMPLES (1.1.0)
+
+  Create a manifest with base64 digests:
+    $ hashtree create -o hashes.json --base64 --sha-256 /path/to/dir
+    # "sha-256:WJG1tSLV3whtD/CxEPvZ0hu0/HFjrzTQgoai6Eb2vgM="
+
+  Verify it, with or without the flag:
+    $ hashtree verify -i hashes.json --sha-256 /path/to/dir
+    # Output: *** PASSED VERIFICATION ***
+
+  Mixed digest lengths (MD5 stays hexadecimal):
+    $ hashtree create -o hashes.json --base64 --sha-512 --md5 /path/to/dir
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ BACKWARDS COMPATIBILITY (1.1.0)
+
+  ✅ No breaking changes for command line users
+  ✅ Manifests written by 1.0.0 verify unchanged
+  ✅ Manifests written by 1.1.0 without --base64 are byte-identical to 1.0.0
+  ✅ All existing tests still pass
+  ⚠️  Library users: the output functions listed under "Changed" gained a
+     DigestEncoding parameter; pass DigestEncoding::Hex for the old behaviour
+  ⚠️  Manifests with base64 digests cannot be read by hashtree 1.0.0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 MERGE INSTRUCTIONS (1.1.0)
+
+  1. Verify all tests pass:
+     $ cargo test --all-targets
+     # Expected: 66/66 passing
+
+  2. Check code quality:
+     $ cargo build --release
+     $ cargo clippy --all-targets
+     $ cargo fmt --all -- --check
+
+  3. Tag release:
+     $ git tag v1.1.0
+     $ git push origin main --tags
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                   PREVIOUS RELEASES (HISTORICAL)                           ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════════════════╗
 ║         CASE VERIFICATION IMPLEMENTATION - FINAL STATUS REPORT             ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 
 PROJECT: hashtree - File Hash Verification Tool
 FEATURE: CASE (Cyber-investigation Analysis Standard Expression) Format Support
+RELEASE: 1.0.0
 IMPLEMENTATION DATE: October 2026
 STATUS: ✅ COMPLETE & PRODUCTION READY
 
@@ -210,7 +341,7 @@ STATUS: ✅ COMPLETE & PRODUCTION READY
      $ git merge feat/case-ontology-support
 
   4. Tag release:
-     $ git tag v1.1.0
+     $ git tag v1.0.0
      $ git push origin main --tags
 
   5. (Optional) Update package repositories

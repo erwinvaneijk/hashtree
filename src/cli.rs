@@ -65,6 +65,12 @@ pub struct CommonArgs {
     #[arg(short = 's', long = "style", default_value = "json")]
     pub style: String,
 
+    /// Write digests of at least 256 bits in base64 instead of hexadecimal.
+    /// Shorter digests stay hexadecimal, and digests that are read back in may
+    /// use either encoding.
+    #[arg(short = 'b', long = "base64")]
+    pub base64: bool,
+
     #[arg(value_name = "dir")]
     pub paths: Vec<PathBuf>,
 }
