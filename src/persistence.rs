@@ -71,8 +71,8 @@ fn persist_oldstyle(
         writeln!(&mut file, "{file_path}")?;
         for (algorithm, hex_digest) in &digest_result.digests {
             let label = algorithm.oldstyle_label();
-            let digest = encoding.render_grouped(hex_digest, 4);
-            writeln!(&mut file, "\t{label}:\t{digest}")?;
+            let encoded_digest = encoding.render_grouped(hex_digest, 4);
+            writeln!(&mut file, "\t{label}:\t{encoded_digest}")?;
         }
     }
 
@@ -110,8 +110,8 @@ fn load_oldstyle(path: &Path) -> AppResult<DirHasherResult> {
             continue;
         }
 
-        if let Some((algorithm, digest)) = parse_oldstyle_digest_line(&line) {
-            digest_result.add_digest(algorithm, &digest);
+        if let Some((algorithm, encoded_digest)) = parse_oldstyle_digest_line(&line) {
+            digest_result.add_digest(algorithm, &encoded_digest);
         }
     }
 

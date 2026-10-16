@@ -18,13 +18,14 @@ pub fn print_missing_entries(
 
 pub fn print_digest_entry(
     path: &str,
-    digests: &DigestResult,
+    digest_result: &DigestResult,
     out: &mut dyn Write,
     encoding: DigestEncoding,
 ) -> io::Result<()> {
     writeln!(out, "{path}")?;
-    for (algorithm, hex_digest) in &digests.digests {
-        writeln!(out, "\t{algorithm}\t{}", encoding.render(hex_digest))?;
+    for (algorithm, hex_digest) in &digest_result.digests {
+        let encoded_digest = encoding.render(hex_digest);
+        writeln!(out, "\t{algorithm}\t{encoded_digest}")?;
     }
     Ok(())
 }
@@ -41,13 +42,9 @@ pub fn pretty_print_result(
     for (path, digest_result) in entries {
         writeln!(out, "\t{path}")?;
         for (algorithm, hex_digest) in &digest_result.digests {
+            let encoded_digest = encoding.render_grouped(hex_digest, 4);
             let mut line = String::new();
-            let _ = write!(
-                &mut line,
-                "{}\t{}",
-                algorithm,
-                encoding.render_grouped(hex_digest, 4)
-            );
+            let _ = write!(&mut line, "{algorithm}\t{encoded_digest}");
             writeln!(out, "\t\t{line}")?;
         }
     }
