@@ -59,7 +59,8 @@ pub fn convert_to_case(
 
         // Add hashes
         for (algorithm, hex_digest) in &digest_result.digests {
-            let hash = CaseHash::new(algorithm.oldstyle_label(), encoding.render(hex_digest));
+            let encoded_digest = encoding.render(hex_digest);
+            let hash = CaseHash::new(algorithm.oldstyle_label(), encoded_digest);
             case_file.hashes.push(hash);
         }
 

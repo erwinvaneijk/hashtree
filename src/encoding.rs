@@ -83,8 +83,8 @@ fn encode_base64(hex_digest: &str) -> Option<String> {
 /// hexadecimal and the base64 form of a digest never have the same length.
 /// Values that are neither are kept as their hexadecimal characters, which
 /// preserves the lenient behaviour of older manifests.
-pub fn decode_digest(algorithm: &Algorithm, value: &str) -> String {
-    let compact: String = value
+pub fn decode_digest(algorithm: &Algorithm, encoded_digest: &str) -> String {
+    let compact: String = encoded_digest
         .chars()
         .filter(|character| !character.is_whitespace())
         .collect();
@@ -97,7 +97,7 @@ pub fn decode_digest(algorithm: &Algorithm, value: &str) -> String {
         return hex_digest;
     }
 
-    normalize_hex(value)
+    normalize_hex(encoded_digest)
 }
 
 fn is_hex(value: &str) -> bool {
@@ -111,14 +111,14 @@ fn has_hex_length_of(algorithm: &Algorithm, length: usize) -> bool {
     }
 }
 
-fn decode_base64(algorithm: &Algorithm, value: &str) -> Option<String> {
-    if value.is_empty() {
+fn decode_base64(algorithm: &Algorithm, base64_digest: &str) -> Option<String> {
+    if base64_digest.is_empty() {
         return None;
     }
 
     let bytes = BASE64_STANDARD_INPUT
-        .decode(value)
-        .or_else(|_| BASE64_URL_SAFE_INPUT.decode(value))
+        .decode(base64_digest)
+        .or_else(|_| BASE64_URL_SAFE_INPUT.decode(base64_digest))
         .ok()?;
 
     match algorithm.digest_length_bytes() {
@@ -204,9 +204,9 @@ mod tests {
             (Algorithm::Sha3_512, 64),
         ] {
             let hex_digest = "ab".repeat(digest_bytes);
-            let rendered = DigestEncoding::Base64.render(&hex_digest);
+            let encoded_digest = DigestEncoding::Base64.render(&hex_digest);
             assert_eq!(
-                decode_digest(&algorithm, &rendered),
+                decode_digest(&algorithm, &encoded_digest),
                 hex_digest,
                 "{algorithm} should round trip"
             );

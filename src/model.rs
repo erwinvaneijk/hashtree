@@ -42,13 +42,13 @@ pub struct DigestResult {
 impl DigestResult {
     /// Add a digest value that is either hexadecimal or base64 encoded; it is
     /// stored as canonical lowercase hexadecimal.
-    pub fn add_digest(&mut self, algorithm: Algorithm, digest: &str) {
-        let hex_digest = decode_digest(&algorithm, digest);
+    pub fn add_digest(&mut self, algorithm: Algorithm, encoded_digest: &str) {
+        let hex_digest = decode_digest(&algorithm, encoded_digest);
         self.digests.insert(algorithm, hex_digest);
     }
 
-    pub fn add_digest_name(&mut self, algorithm: &str, digest: &str) {
-        self.add_digest(Algorithm::from_name(algorithm), digest);
+    pub fn add_digest_name(&mut self, algorithm: &str, encoded_digest: &str) {
+        self.add_digest(Algorithm::from_name(algorithm), encoded_digest);
     }
 
     pub fn matches(&self, other: &Self) -> bool {
@@ -69,7 +69,7 @@ impl DigestResult {
     pub fn equals_subset_of(&self, other: &Self) -> bool {
         self.digests
             .iter()
-            .all(|(algorithm, hex)| other.digests.get(algorithm) == Some(hex))
+            .all(|(algorithm, hex_digest)| other.digests.get(algorithm) == Some(hex_digest))
     }
 
     pub fn algorithms(&self) -> Vec<String> {
@@ -111,8 +111,8 @@ impl Serialize for EncodedDigestResult<'_> {
         let digests = &self.digests.digests;
         let mut seq = serializer.serialize_seq(Some(digests.len()))?;
         for (algorithm, hex_digest) in digests {
-            let digest = self.encoding.render(hex_digest);
-            seq.serialize_element(&format!("{algorithm}:{digest}"))?;
+            let encoded_digest = self.encoding.render(hex_digest);
+            seq.serialize_element(&format!("{algorithm}:{encoded_digest}"))?;
         }
         seq.end()
     }
@@ -126,10 +126,10 @@ impl<'de> Deserialize<'de> for DigestResult {
         let raw = Vec::<String>::deserialize(deserializer)?;
         let mut result = Self::default();
         for digest in raw {
-            let (algorithm, value) = digest
+            let (algorithm, encoded_digest) = digest
                 .split_once(':')
                 .ok_or_else(|| D::Error::custom(format!("Invalid digest format: {digest}")))?;
-            result.add_digest_name(algorithm, value);
+            result.add_digest_name(algorithm, encoded_digest);
         }
         Ok(result)
     }
