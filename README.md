@@ -3,7 +3,7 @@
 A Rust reimplementation of the [`jHashtools`](https://github.com/erwinvaneijk/jHashtools/)
 workflow.
 
-Current stable release: **1.1.0**
+Current stable release: **2.0.0**
 
 It supports:
 
