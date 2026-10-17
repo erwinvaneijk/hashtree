@@ -113,7 +113,7 @@ fn verify_mode_reports_differences_when_file_changes() {
         .arg("--sha-256")
         .arg(&tree_dir)
         .assert()
-        .success()
+        .code(1)
         .stdout(predicate::str::contains("There are differences."));
 }
 
@@ -175,7 +175,7 @@ fn output_file_requires_force_overwrite() {
         .arg("--sha-256")
         .arg(&tree_dir)
         .assert()
-        .failure()
+        .code(7)
         .stderr(predicate::str::contains(
             "exists or not forced to be overwritten",
         ));
@@ -350,6 +350,164 @@ fn base64_old_style_roundtrip_verification_passes() {
         .assert()
         .success()
         .stdout(predicate::str::contains("*** PASSED VERIFICATION ***"));
+}
+
+#[test]
+fn verify_exits_one_when_a_file_is_added() {
+    let (temp, tree_dir) = copy_fixture_tree();
+    let manifest = create_manifest(&temp, &tree_dir);
+    fs::write(tree_dir.join("added.txt"), "new file\n").expect("should add a file");
+
+    verify(&manifest, &tree_dir)
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("Verification failed"));
+}
+
+#[test]
+fn verify_exits_one_when_a_file_is_removed() {
+    let (temp, tree_dir) = copy_fixture_tree();
+    let manifest = create_manifest(&temp, &tree_dir);
+    fs::remove_file(tree_dir.join("alpha.txt")).expect("should remove a file");
+
+    verify(&manifest, &tree_dir).assert().code(1);
+}
+
+#[test]
+fn zero_jobs_exits_with_code_3() {
+    let (temp, tree_dir) = copy_fixture_tree();
+
+    hashtree()
+        .arg("create")
+        .arg("-o")
+        .arg(temp.path().join("hashes.json"))
+        .arg("--jobs")
+        .arg("0")
+        .arg(&tree_dir)
+        .assert()
+        .code(3);
+}
+
+#[test]
+fn unsupported_style_exits_with_code_4() {
+    let (temp, tree_dir) = copy_fixture_tree();
+
+    hashtree()
+        .arg("create")
+        .arg("-o")
+        .arg(temp.path().join("hashes.yaml"))
+        .arg("--style")
+        .arg("yaml")
+        .arg(&tree_dir)
+        .assert()
+        .code(4);
+}
+
+#[test]
+fn xml_style_exits_with_code_5() {
+    let (temp, tree_dir) = copy_fixture_tree();
+
+    hashtree()
+        .arg("create")
+        .arg("-o")
+        .arg(temp.path().join("hashes.xml"))
+        .arg("--style")
+        .arg("xml")
+        .arg(&tree_dir)
+        .assert()
+        .code(5);
+}
+
+#[test]
+fn missing_input_path_exits_with_code_6() {
+    let temp = tempfile::tempdir().expect("temp dir creation should succeed");
+
+    hashtree()
+        .arg("create")
+        .arg("-o")
+        .arg(temp.path().join("hashes.json"))
+        .arg(temp.path().join("does-not-exist"))
+        .assert()
+        .code(6);
+}
+
+#[test]
+fn invalid_old_style_header_exits_with_code_8() {
+    let (temp, tree_dir) = copy_fixture_tree();
+    let manifest = temp.path().join("hashes.txt");
+    fs::write(&manifest, "not a manifest\n").expect("should write manifest");
+
+    hashtree()
+        .arg("verify")
+        .arg("-i")
+        .arg(&manifest)
+        .arg("--style")
+        .arg("old")
+        .arg(&tree_dir)
+        .assert()
+        .code(8);
+}
+
+#[test]
+fn invalid_case_manifest_exits_with_code_9() {
+    let (temp, tree_dir) = copy_fixture_tree();
+    let manifest = temp.path().join("hashes.jsonld");
+    fs::write(&manifest, "[]").expect("should write manifest");
+
+    hashtree()
+        .arg("verify")
+        .arg("-i")
+        .arg(&manifest)
+        .arg("--style")
+        .arg("case")
+        .arg(&tree_dir)
+        .assert()
+        .code(9);
+}
+
+#[test]
+fn corrupt_json_manifest_exits_with_code_10() {
+    let (temp, tree_dir) = copy_fixture_tree();
+    let manifest = temp.path().join("hashes.json");
+    fs::write(&manifest, "{").expect("should write manifest");
+
+    verify(&manifest, &tree_dir).assert().code(10);
+}
+
+#[test]
+fn missing_manifest_exits_with_code_13() {
+    let (temp, tree_dir) = copy_fixture_tree();
+
+    verify(&temp.path().join("missing.json"), &tree_dir)
+        .assert()
+        .code(13);
+}
+
+#[test]
+fn unknown_argument_exits_with_code_2() {
+    hashtree().arg("create").arg("--md2").assert().code(2);
+}
+
+fn hashtree() -> Command {
+    Command::cargo_bin("hashtree").expect("binary should build")
+}
+
+fn create_manifest(temp: &TempDir, tree_dir: &Path) -> PathBuf {
+    let manifest = temp.path().join("hashes.json");
+    hashtree()
+        .arg("create")
+        .arg("-o")
+        .arg(&manifest)
+        .arg(tree_dir)
+        .assert()
+        .success();
+    manifest
+}
+
+fn verify(manifest: &Path, tree_dir: &Path) -> Command {
+    let mut command = hashtree();
+    command.arg("verify").arg("-i").arg(manifest).arg(tree_dir);
+    command
 }
 
 fn fixture_root() -> PathBuf {

@@ -87,9 +87,7 @@ fn resolve_verify(args: VerifyArgs) -> AppResult<VerifyCommand> {
 
 fn resolve_common(common: CommonArgs) -> AppResult<SharedCommandOptions> {
     if let Some(0) = common.jobs {
-        return Err(AppError::Message(
-            "--jobs must be greater than zero".to_string(),
-        ));
+        return Err(AppError::InvalidJobCount);
     }
 
     let mut algorithms = selected_algorithms(&common.algorithm_selection);
@@ -116,7 +114,7 @@ pub fn run(cli: Cli) -> ExitCode {
         Ok(command) => command,
         Err(error) => {
             eprintln!("{error}");
-            return ExitCode::from(2);
+            return ExitCode::from(error.exit_code());
         }
     };
 
@@ -125,14 +123,14 @@ pub fn run(cli: Cli) -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("{error}");
-                ExitCode::from(255)
+                ExitCode::from(error.exit_code())
             }
         },
         AppCommand::Verify(command) => match verify_mode(&command) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("{error}");
-                ExitCode::from(254)
+                ExitCode::from(error.exit_code())
             }
         },
     };
@@ -309,7 +307,7 @@ fn verify_mode(command: &VerifyCommand) -> AppResult<()> {
         }
     }
 
-    Ok(())
+    Err(AppError::VerificationFailed)
 }
 
 struct VerifyEval {
@@ -402,7 +400,7 @@ fn evaluate_verification(
                     ThreadPoolBuilder::new()
                         .num_threads(job_count)
                         .build()
-                        .map_err(|error| AppError::Message(error.to_string()))?
+                        .map_err(|error| AppError::ThreadPool(error.to_string()))?
                         .install(evaluate_parallel)
                 } else {
                     evaluate_parallel()

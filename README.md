@@ -113,6 +113,37 @@ Verify-specific options:
 -n, --ignorecase
 ```
 
+## Exit codes
+
+Every outcome has its own exit code, so scripts can tell a failed verification
+apart from a problem running the tool:
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success: the manifest was created, or verification passed |
+| 1 | Verification failed: files were modified, added or removed |
+| 2 | Invalid command line, such as an unknown option or a missing argument |
+| 3 | `--jobs` is zero |
+| 4 | Unsupported `--style` value |
+| 5 | The `xml` style is not supported yet |
+| 6 | An input path does not exist |
+| 7 | The output file already exists and `--force` was not given |
+| 8 | The old-style manifest has an invalid header |
+| 9 | The CASE manifest is not valid JSON-LD (not an object, or no `@graph`) |
+| 10 | The JSON manifest could not be parsed or written |
+| 11 | The written manifest could not be hashed for the summary |
+| 12 | The worker thread pool could not be created |
+| 13 | Any other I/O error, such as an unreadable manifest or file |
+
+```bash
+hashtree verify -i hashes.json /path/to/dir
+case $? in
+    0) echo "all files match" ;;
+    1) echo "files have changed" ;;
+    *) echo "verification could not be run" ;;
+esac
+```
+
 ## CASE Ontology Support
 
 Hashtree now supports exporting and verifying file hashes in **CASE JSON-LD

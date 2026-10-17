@@ -292,7 +292,7 @@ fn verify_case_format_detects_modified_files() {
 
     verify_cmd
         .assert()
-        .success()
+        .code(1)
         .stdout(contains("There are differences"));
 }
 
