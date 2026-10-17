@@ -104,7 +104,7 @@ pub fn generate_digests(
                     ThreadPoolBuilder::new()
                         .num_threads(job_count)
                         .build()
-                        .map_err(|error| AppError::Message(error.to_string()))?
+                        .map_err(|error| AppError::ThreadPool(error.to_string()))?
                         .install(run_parallel)
                 } else {
                     run_parallel()

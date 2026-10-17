@@ -17,7 +17,7 @@ pub fn load_case(path: &Path) -> AppResult<DirHasherResult> {
 
     // Validate JSON-LD structure
     if !json.is_object() {
-        return Err(crate::error::AppError::Message(
+        return Err(crate::error::AppError::InvalidCaseFile(
             "CASE file must be a JSON object".to_string(),
         ));
     }
@@ -27,7 +27,7 @@ pub fn load_case(path: &Path) -> AppResult<DirHasherResult> {
         .get("@graph")
         .and_then(|v| v.as_array())
         .ok_or_else(|| {
-            crate::error::AppError::Message("CASE file must have @graph array".to_string())
+            crate::error::AppError::InvalidCaseFile("CASE file must have @graph array".to_string())
         })?;
 
     let mut result = DirHasherResult::default();
