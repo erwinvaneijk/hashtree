@@ -50,6 +50,23 @@ fn hash_file_computes_known_md5_and_sha256() {
 }
 
 #[test]
+fn hash_file_computes_known_ripemd160() {
+    let temp = tempfile::tempdir().expect("temp directory should be created");
+    let file_path = temp.path().join("sample.txt");
+    fs::write(&file_path, b"abc").expect("fixture file should be written");
+
+    let digests = hash_file(&file_path, &[Algorithm::Ripemd160]).expect("hashing should succeed");
+
+    assert_eq!(
+        digests
+            .digests
+            .get(&Algorithm::Ripemd160)
+            .map(String::as_str),
+        Some("8eb208f7e05d987a9b044a8e98c6b087f15a0bfc")
+    );
+}
+
+#[test]
 fn verify_difference_helpers_return_expected_sets() {
     let mut left = DirHasherResult::default();
     let mut left_digest = DigestResult::default();

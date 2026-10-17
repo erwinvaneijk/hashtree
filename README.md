@@ -8,7 +8,7 @@ Current stable release: **1.1.0**
 It supports:
 
 - Recursive file hashing for files/directories
-- Multiple digest algorithms (9 total: `md2`, `md5`, `sha-1`, `sha-256`,
+- Multiple digest algorithms (9 total: `md5`, `sha-1`, `ripemd-160`, `sha-256`,
   `sha-384`, `sha-512`, `sha3-256`, `sha3-384`, `sha3-512`)
 - Writing digest manifests in multiple formats:
   - `json` - Machine-readable JSON format
@@ -63,7 +63,7 @@ Common options for both subcommands:
     --sha-384
     --sha-512
     --md5
-    --md2
+    --ripemd-160
 -a, --all
 -b, --base64
 -v, --verbose
@@ -77,7 +77,7 @@ Common options for both subcommands:
 By default every digest is written as lowercase hexadecimal. With `--base64`,
 digests of at least 256 bits (`sha-256`, `sha-384`, `sha-512`, `sha3-256`,
 `sha3-384` and `sha3-512`) are written in standard base64 instead. Shorter
-digests (`md2`, `md5`, `sha-1`) stay hexadecimal, because base64 buys little
+digests (`md5`, `sha-1`, `ripemd-160`) stay hexadecimal, because base64 buys little
 there and would only make the manifest harder to compare with other tools.
 
 The encoding is a presentation choice only; it applies to all styles (`json`,

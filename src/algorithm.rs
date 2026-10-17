@@ -3,7 +3,6 @@ use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Algorithm {
-    Md2,
     Md5,
     Sha1,
     Sha256,
@@ -12,6 +11,7 @@ pub enum Algorithm {
     Sha3_256,
     Sha3_384,
     Sha3_512,
+    Ripemd160,
     Other(String),
 }
 
@@ -19,7 +19,6 @@ impl Algorithm {
     pub fn from_name(value: &str) -> Self {
         let normalized = value.trim().to_ascii_lowercase();
         match normalized.as_str() {
-            "md2" => Self::Md2,
             "md5" => Self::Md5,
             "sha" | "sha1" | "sha-1" => Self::Sha1,
             "sha256" | "sha-256" => Self::Sha256,
@@ -28,6 +27,7 @@ impl Algorithm {
             "sha3" | "sha3-256" | "sha3256" => Self::Sha3_256,
             "sha3-384" | "sha3384" => Self::Sha3_384,
             "sha3-512" | "sha3512" => Self::Sha3_512,
+            "ripemd160" | "ripemd-160" | "rmd160" => Self::Ripemd160,
             _ => Self::Other(normalized),
         }
     }
@@ -46,12 +46,12 @@ impl Algorithm {
             Self::Md5 => "MD5".to_string(),
             Self::Sha1 => "SHA-1".to_string(),
             Self::Sha256 => "SHA-256".to_string(),
-            Self::Md2 => "MD2".to_string(),
             Self::Sha384 => "SHA-384".to_string(),
             Self::Sha512 => "SHA-512".to_string(),
             Self::Sha3_256 => "SHA3-256".to_string(),
             Self::Sha3_384 => "SHA3-384".to_string(),
             Self::Sha3_512 => "SHA3-512".to_string(),
+            Self::Ripemd160 => "RIPEMD-160".to_string(),
             Self::Other(value) => value.to_ascii_uppercase(),
         }
     }
@@ -63,8 +63,8 @@ impl Algorithm {
     /// Length of the digest in bytes, or `None` for an unknown algorithm.
     pub fn digest_length_bytes(&self) -> Option<usize> {
         match self {
-            Self::Md2 | Self::Md5 => Some(16),
-            Self::Sha1 => Some(20),
+            Self::Md5 => Some(16),
+            Self::Sha1 | Self::Ripemd160 => Some(20),
             Self::Sha256 | Self::Sha3_256 => Some(32),
             Self::Sha384 | Self::Sha3_384 => Some(48),
             Self::Sha512 | Self::Sha3_512 => Some(64),
@@ -76,7 +76,6 @@ impl Algorithm {
 impl fmt::Display for Algorithm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Md2 => write!(f, "md2"),
             Self::Md5 => write!(f, "md5"),
             Self::Sha1 => write!(f, "sha-1"),
             Self::Sha256 => write!(f, "sha-256"),
@@ -85,6 +84,7 @@ impl fmt::Display for Algorithm {
             Self::Sha3_256 => write!(f, "sha3-256"),
             Self::Sha3_384 => write!(f, "sha3-384"),
             Self::Sha3_512 => write!(f, "sha3-512"),
+            Self::Ripemd160 => write!(f, "ripemd-160"),
             Self::Other(value) => write!(f, "{value}"),
         }
     }
@@ -99,6 +99,14 @@ mod tests {
         assert_eq!(Algorithm::from_name("SHA1"), Algorithm::Sha1);
         assert_eq!(Algorithm::from_name("sha256"), Algorithm::Sha256);
         assert_eq!(Algorithm::Sha256.to_string(), "sha-256");
+        assert_eq!(Algorithm::from_name("RIPEMD160"), Algorithm::Ripemd160);
+        assert_eq!(Algorithm::from_name("rmd160"), Algorithm::Ripemd160);
+        assert_eq!(Algorithm::Ripemd160.to_string(), "ripemd-160");
+    }
+
+    #[test]
+    fn md2_is_no_longer_supported() {
+        assert!(!Algorithm::from_name("md2").is_supported());
     }
 
     #[test]
@@ -113,6 +121,7 @@ mod tests {
     fn digest_lengths_match_the_algorithms() {
         assert_eq!(Algorithm::Md5.digest_length_bytes(), Some(16));
         assert_eq!(Algorithm::Sha1.digest_length_bytes(), Some(20));
+        assert_eq!(Algorithm::Ripemd160.digest_length_bytes(), Some(20));
         assert_eq!(Algorithm::Sha256.digest_length_bytes(), Some(32));
         assert_eq!(Algorithm::Sha3_384.digest_length_bytes(), Some(48));
         assert_eq!(Algorithm::Sha512.digest_length_bytes(), Some(64));

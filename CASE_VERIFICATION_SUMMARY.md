@@ -87,7 +87,7 @@ hashtree verify --input manifest.jsonld --style case --all f1.txt f2.txt f3.txt
 echo "TAMPERED" > f1.txt
 
 # Verify detects tampering across all 9 algorithms
-# MD2, MD5, SHA-1, SHA-256, SHA-384, SHA-512, SHA3-256, SHA3-384, SHA3-512
+# MD5, SHA-1, RIPEMD-160, SHA-256, SHA-384, SHA-512, SHA3-256, SHA3-384, SHA3-512
 ```
 
 #### Test 2: JSON-LD Structure Validation ✅

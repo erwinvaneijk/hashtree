@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 
 use digest::Digest as _;
 use filetime::FileTime;
-use md2::Md2;
 use md5::Md5;
 use rayon::ThreadPoolBuilder;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
+use ripemd::Ripemd160;
 use sha1::Sha1;
 use sha2::{Sha256, Sha384, Sha512};
 use sha3::{Sha3_256, Sha3_384, Sha3_512};
@@ -247,7 +247,6 @@ pub fn hash_file_with_buffer(
 }
 
 pub enum AnyHasher {
-    Md2(Md2),
     Md5(Md5),
     Sha1(Sha1),
     Sha256(Sha256),
@@ -256,12 +255,12 @@ pub enum AnyHasher {
     Sha3_256(Sha3_256),
     Sha3_384(Sha3_384),
     Sha3_512(Sha3_512),
+    Ripemd160(Ripemd160),
 }
 
 impl AnyHasher {
     pub fn update(&mut self, data: &[u8]) {
         match self {
-            Self::Md2(hasher) => hasher.update(data),
             Self::Md5(hasher) => hasher.update(data),
             Self::Sha1(hasher) => hasher.update(data),
             Self::Sha256(hasher) => hasher.update(data),
@@ -270,12 +269,12 @@ impl AnyHasher {
             Self::Sha3_256(hasher) => hasher.update(data),
             Self::Sha3_384(hasher) => hasher.update(data),
             Self::Sha3_512(hasher) => hasher.update(data),
+            Self::Ripemd160(hasher) => hasher.update(data),
         }
     }
 
     pub fn finalize_hex(self) -> String {
         match self {
-            Self::Md2(hasher) => hex::encode(hasher.finalize()),
             Self::Md5(hasher) => hex::encode(hasher.finalize()),
             Self::Sha1(hasher) => hex::encode(hasher.finalize()),
             Self::Sha256(hasher) => hex::encode(hasher.finalize()),
@@ -284,13 +283,13 @@ impl AnyHasher {
             Self::Sha3_256(hasher) => hex::encode(hasher.finalize()),
             Self::Sha3_384(hasher) => hex::encode(hasher.finalize()),
             Self::Sha3_512(hasher) => hex::encode(hasher.finalize()),
+            Self::Ripemd160(hasher) => hex::encode(hasher.finalize()),
         }
     }
 }
 
 pub fn create_hasher(name: &Algorithm) -> Option<AnyHasher> {
     match name {
-        Algorithm::Md2 => Some(AnyHasher::Md2(Md2::new())),
         Algorithm::Md5 => Some(AnyHasher::Md5(Md5::new())),
         Algorithm::Sha1 => Some(AnyHasher::Sha1(Sha1::new())),
         Algorithm::Sha256 => Some(AnyHasher::Sha256(Sha256::new())),
@@ -299,6 +298,7 @@ pub fn create_hasher(name: &Algorithm) -> Option<AnyHasher> {
         Algorithm::Sha3_256 => Some(AnyHasher::Sha3_256(Sha3_256::new())),
         Algorithm::Sha3_384 => Some(AnyHasher::Sha3_384(Sha3_384::new())),
         Algorithm::Sha3_512 => Some(AnyHasher::Sha3_512(Sha3_512::new())),
+        Algorithm::Ripemd160 => Some(AnyHasher::Ripemd160(Ripemd160::new())),
         _ => None,
     }
 }

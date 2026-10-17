@@ -101,8 +101,8 @@ pub struct AlgorithmSelection {
     #[arg(long = "md5")]
     pub md5: bool,
 
-    #[arg(long = "md2")]
-    pub md2: bool,
+    #[arg(long = "ripemd-160")]
+    pub ripemd160: bool,
 
     #[arg(short = 'a', long = "all")]
     pub all: bool,
