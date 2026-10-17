@@ -168,8 +168,8 @@ fn selected_algorithms(selection: &AlgorithmSelection) -> Vec<Algorithm> {
     if selection.all || selection.md5 {
         names.insert(Algorithm::Md5);
     }
-    if selection.all || selection.md2 {
-        names.insert(Algorithm::Md2);
+    if selection.all || selection.ripemd160 {
+        names.insert(Algorithm::Ripemd160);
     }
 
     names.into_iter().collect()
@@ -579,7 +579,6 @@ mod tests {
         assert_eq!(
             algorithms,
             vec![
-                Algorithm::Md2,
                 Algorithm::Md5,
                 Algorithm::Sha1,
                 Algorithm::Sha256,
@@ -588,6 +587,7 @@ mod tests {
                 Algorithm::Sha3_256,
                 Algorithm::Sha3_384,
                 Algorithm::Sha3_512,
+                Algorithm::Ripemd160,
             ]
         );
     }

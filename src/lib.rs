@@ -15,4 +15,4 @@ pub mod verify;
 
 pub const BLOCK_READ_SIZE: usize = 1024 * 1024;
 pub const DEFAULT_ALGORITHM: &str = "sha-256";
-pub const VERSION: &str = "1.1.0";
+pub const VERSION: &str = "2.0.0";

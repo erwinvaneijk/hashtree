@@ -172,7 +172,7 @@ STATUS: ✅ COMPLETE & PRODUCTION READY
 
   ✅ CASE JSON-LD Export (Phase 1)
      - 5 CASE ontology objects (Tool, Person, File, Action, Bundle)
-     - 9 hash algorithms (MD2, MD5, SHA-1, SHA-256, SHA-384, SHA-512, SHA3-256/384/512)
+     - 9 hash algorithms (MD5, SHA-1, RIPEMD-160, SHA-256, SHA-384, SHA-512, SHA3-256/384/512)
      - Proper JSON-LD @context and @graph structure
      - Forensically-compliant metadata
 
