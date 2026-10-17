@@ -1,16 +1,23 @@
 name: Release binaries
 
+# Releases in this repository are immutable once published, so assets must be
+# attached while the release is still a draft: build first, then create a
+# draft release, upload the binaries and publish it as the last step.
+
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to build and upload binaries for (e.g. v1.1.0)
+        description: Existing tag to build and release (e.g. v3.0.1)
         required: true
 
 permissions:
   contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   build:
@@ -23,9 +30,6 @@ jobs:
             os: ubuntu-latest
 
     runs-on: ${{ matrix.os }}
-
-    env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
     steps:
       - name: Checkout
@@ -52,9 +56,41 @@ jobs:
           cp "target/${{ matrix.target }}/release/hashtree" LICENSE README.md THIRD_PARTY_NOTICES.md "$name/"
           tar -czf "$name.tar.gz" "$name"
           shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
-          echo "ARCHIVE=$name.tar.gz" >> "$GITHUB_ENV"
 
-      - name: Upload to release
+      - name: Store archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: hashtree-*.tar.gz*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Read release notes from the tag message
+        run: |
+          git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          git tag -l --format='%(contents:body)' "$TAG" > notes.md
+
+      - name: Collect archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create draft, upload binaries, publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" --clobber
+        run: |
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+              gh release create "$TAG" --draft --verify-tag --title "${TAG#v}" --notes-file notes.md
+          fi
+          gh release upload "$TAG" dist/* --clobber
+          gh release edit "$TAG" --draft=false
