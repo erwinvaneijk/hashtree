@@ -179,6 +179,41 @@ hashtree verify --input evidence_manifest.jsonld --style case --all /mnt/evidenc
 See [docs/CASE.md](./docs/CASE.md) for detailed information, validation examples,
 verification workflows, and the complete CASE JSON-LD structure.
 
+## Releasing
+
+Releases are built and published by the `Release binaries` workflow
+(`.github/workflows/release.yml`) when a version tag is pushed. Releases in this
+repository are immutable: once published, a release cannot be changed and its
+tag cannot be reused.
+
+1. Bump `version` in `Cargo.toml` following semantic versioning, run
+   `cargo build` to update `Cargo.lock`, and update the "Current stable release"
+   line at the top of this README. The version reported by `hashtree` is taken
+   from `Cargo.toml`.
+2. Merge the change into `main` through a pull request and make sure CI passes.
+3. Create an annotated tag on `main`. The first line is the tag subject; the rest
+   of the message becomes the release notes:
+
+   ```bash
+   git switch main && git pull
+   git tag -a v3.0.2 -F release-notes.txt
+   git push origin v3.0.2
+   ```
+
+4. The workflow builds `hashtree` for macOS (arm64) and Linux (x86_64, static
+   musl), creates a draft release titled with the version (`3.0.2`), uploads a
+   `.tar.gz` archive and `.sha256` checksum per platform, and publishes the
+   release as the last step.
+
+Do not create the release by hand (`gh release create` or the GitHub web UI)
+before the workflow has run: a published release no longer accepts the
+binaries.
+
+If the workflow fails, the release stays an unpublished draft. Fix the cause and
+rerun it for the same tag with `gh workflow run release.yml -f tag=v3.0.2`. If a
+published release turns out to be broken, it cannot be repaired; release a new
+patch version instead.
+
 ## License
 
 This project is licensed under the **European Union Public Licence v1.2 (EUPL-1.2)**.
