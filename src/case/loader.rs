@@ -3,7 +3,7 @@
 //!
 //! Converts CASE JSON-LD format back to hashtree's internal DirHasherResult
 //! format for verification and comparison operations. Files in the CASE/UCO
-//! structure written since hashtree 3.1 (and by jHashtools) are read strictly;
+//! structure written since hashtree 4.0 (and by jHashtools) are read strictly;
 //! manifests written by earlier releases, which used other namespaces and kept
 //! the hashes directly on the file, are still accepted.
 
@@ -16,7 +16,7 @@ use super::bundle::UCO_CONTEXT;
 use crate::error::{AppError, AppResult};
 use crate::model::{DigestResult, DirHasherResult};
 
-/// Namespace of the `observable` prefix in manifests written before hashtree 3.1
+/// Namespace of the `observable` prefix in manifests written before hashtree 4.0
 const LEGACY_OBSERVABLE_NAMESPACE: &str = "https://ontology.caseontology.org/observable/";
 
 /// Prefixes whose namespaces must match for the keys read here to mean what they say
@@ -159,7 +159,7 @@ fn read_file(file: &Value) -> AppResult<Option<(String, DigestResult)>> {
     Ok(Some((file_path.to_string(), digest_result)))
 }
 
-/// Read the graph of a manifest written before hashtree 3.1
+/// Read the graph of a manifest written before hashtree 4.0
 fn load_legacy_graph(graph: &[Value]) -> DirHasherResult {
     let mut result = DirHasherResult::default();
 

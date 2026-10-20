@@ -66,7 +66,7 @@ UCO requires for facets and hashes. A manifest for one file looks like this
       "@type": "tool:AnalyticTool",
       "core:name": "hashtree",
       "tool:toolType": "hash-calculator",
-      "tool:version": "3.0.1"
+      "tool:version": "4.0.0"
     },
     {
       "@id": "urn:uuid:3600e66d-eb63-4d89-ac54-381522d92bf6",
