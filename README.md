@@ -13,7 +13,7 @@ It supports:
 - Writing digest manifests in multiple formats:
   - `json` - Machine-readable JSON format
   - `old` - Legacy text format
-  - `case` - CASE JSON-LD format (forensically-compliant, standards-based)
+  - `case` - CASE/UCO 1.5.0 JSON-LD format, also read and written by jHashtools
 - Digest output in hexadecimal or, for digests of at least 256 bits, base64
   (`--base64`)
 - Verifying current files against a stored manifest
@@ -80,8 +80,9 @@ digests of at least 256 bits (`sha-256`, `sha-384`, `sha-512`, `sha3-256`,
 digests (`md5`, `sha-1`, `ripemd-160`) stay hexadecimal, because base64 buys little
 there and would only make the manifest harder to compare with other tools.
 
-The encoding is a presentation choice only; it applies to all styles (`json`,
-`old` and `case`) as well as to the reports printed on the console:
+The encoding is a presentation choice only; it applies to the `json` and `old`
+styles as well as to the reports printed on the console. CASE manifests always
+hold hexadecimal digests, because CASE types hash values as `xsd:hexBinary`:
 
 ```bash
 # Create a manifest with base64 digests

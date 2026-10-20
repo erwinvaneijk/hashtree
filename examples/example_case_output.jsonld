@@ -1,86 +1,82 @@
 {
   "@context": {
-    "action": "https://ontology.caseontology.org/action/",
-    "core": "https://ontology.caseontology.org/core/",
-    "identity": "https://ontology.caseontology.org/identity/",
-    "investigation": "https://ontology.caseontology.org/investigation/",
-    "observable": "https://ontology.caseontology.org/observable/",
-    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-    "tool": "https://ontology.caseontology.org/tool/",
-    "types": "https://ontology.caseontology.org/types/"
+    "action": "https://ontology.unifiedcyberontology.org/uco/action/",
+    "case-investigation": "https://ontology.caseontology.org/case/investigation/",
+    "core": "https://ontology.unifiedcyberontology.org/uco/core/",
+    "identity": "https://ontology.unifiedcyberontology.org/uco/identity/",
+    "observable": "https://ontology.unifiedcyberontology.org/uco/observable/",
+    "tool": "https://ontology.unifiedcyberontology.org/uco/tool/",
+    "types": "https://ontology.unifiedcyberontology.org/uco/types/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
   },
   "@graph": [
     {
-      "@id": "case:tool-hashtree-1",
+      "@id": "urn:uuid:face736b-7e6f-4bb8-b65d-31eb282004a1",
       "@type": "tool:AnalyticTool",
-      "tool:name": "hashtree",
+      "core:name": "hashtree",
       "tool:toolType": "hash-calculator",
-      "tool:version": "1.0.0"
+      "tool:version": "3.0.1"
     },
     {
-      "@id": "case:identity-operator",
+      "@id": "urn:uuid:3600e66d-eb63-4d89-ac54-381522d92bf6",
       "@type": "identity:Person",
       "core:name": "forensic_examiner"
     },
     {
-      "@id": "case:file-1",
+      "@id": "urn:uuid:66f9b775-5ffa-46e1-81b6-f399ea32d6fd",
       "@type": "observable:File",
-      "observable:fileName": "evidence.bin",
-      "observable:filePath": "/evidence/device01/evidence.bin",
-      "observable:hashes": [
-        {
-          "types:hashMethod": "MD5",
-          "types:hashValue": "5d41402abc4b2a76b9719d911017c592"
-        },
-        {
-          "types:hashMethod": "SHA-256",
-          "types:hashValue": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        },
-        {
-          "types:hashMethod": "SHA-512",
-          "types:hashValue": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
-        }
-      ]
-    },
-    {
-      "@id": "case:file-2",
-      "@type": "observable:File",
-      "observable:fileName": "system32.dll",
-      "observable:filePath": "/evidence/device01/Windows/System32/system32.dll",
-      "observable:hashes": [
-        {
-          "types:hashMethod": "MD5",
-          "types:hashValue": "098f6bcd4621d373cade4e832627b4f6"
-        },
-        {
-          "types:hashMethod": "SHA-256",
-          "types:hashValue": "6b86b273f403eb22c4f27d00695369f5a325b2e7d0d7c0cd5e3e1e0e5c9f1e5d"
-        }
-      ]
-    },
-    {
-      "@id": "case:action-hash-1",
-      "@type": "investigation:InvestigativeAction",
-      "action:instrument": {
-        "@id": "case:tool-hashtree-1"
-      },
-      "action:result": {
-        "@id": "case:bundle-results"
-      },
-      "action:startTime": "2026-10-12T14:30:00.000+0200",
-      "investigation:performer": "case:identity-operator"
-    },
-    {
-      "@id": "case:bundle-results",
-      "@type": "core:Bundle",
       "core:hasFacet": [
         {
-          "@id": "case:file-1"
+          "@id": "urn:uuid:ed136e4f-70c1-4aa5-a7be-ad4f6e354622",
+          "@type": "observable:FileFacet",
+          "observable:fileName": "notes.txt",
+          "observable:filePath": "evidence/notes.txt"
         },
         {
-          "@id": "case:file-2"
+          "@id": "urn:uuid:17056f34-6993-4477-afcd-1e564b964255",
+          "@type": "observable:ContentDataFacet",
+          "observable:hash": [
+            {
+              "@id": "urn:uuid:abbfc47e-70a7-41c5-ae95-b2c52f1c9ece",
+              "@type": "types:Hash",
+              "types:hashMethod": "MD5",
+              "types:hashValue": {
+                "@type": "xsd:hexBinary",
+                "@value": "b1946ac92492d2347c6235b4d2611184"
+              }
+            },
+            {
+              "@id": "urn:uuid:555a2db2-0514-4aeb-950d-50415914e56c",
+              "@type": "types:Hash",
+              "types:hashMethod": "SHA256",
+              "types:hashValue": {
+                "@type": "xsd:hexBinary",
+                "@value": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+              }
+            }
+          ]
         }
       ]
+    },
+    {
+      "@id": "urn:uuid:3825a8d5-94ad-44de-85c5-7848ddd81d8b",
+      "@type": "case-investigation:InvestigativeAction",
+      "action:instrument": {
+        "@id": "urn:uuid:face736b-7e6f-4bb8-b65d-31eb282004a1"
+      },
+      "action:performer": {
+        "@id": "urn:uuid:3600e66d-eb63-4d89-ac54-381522d92bf6"
+      },
+      "action:result": [
+        {
+          "@id": "urn:uuid:66f9b775-5ffa-46e1-81b6-f399ea32d6fd"
+        }
+      ],
+      "action:startTime": {
+        "@type": "xsd:dateTime",
+        "@value": "2026-10-20T11:54:35.116+02:00"
+      },
+      "core:name": "Compute digests"
     }
   ]
 }
