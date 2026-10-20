@@ -6,12 +6,17 @@
 
 use std::time::SystemTime;
 
+/// Create a new, unique IRI for a CASE object
+pub fn new_id() -> String {
+    format!("urn:uuid:{}", uuid::Uuid::new_v4())
+}
+
 /// Represents a hash in CASE format
 #[derive(Debug, Clone)]
 pub struct CaseHash {
     /// Hash algorithm name (e.g., "MD5", "SHA-256", "SHA-512")
     pub hash_method: String,
-    /// Hexadecimal digest value
+    /// Hexadecimal digest value (CASE types it as xsd:hexBinary)
     pub hash_value: String,
 }
 
@@ -100,30 +105,30 @@ impl CaseTool {
 pub struct CaseAction {
     /// Unique identifier
     pub id: String,
-    /// Name of the person who performed the action
-    pub performer_name: String,
+    /// ID of the person who performed the action
+    pub performer_id: String,
     /// When the action started
     pub start_time: SystemTime,
     /// ID of the instrument (tool) used
     pub instrument_id: String,
-    /// ID of the result bundle
-    pub result_id: String,
+    /// IDs of the results (the hashed files)
+    pub result_ids: Vec<String>,
 }
 
 impl CaseAction {
     pub fn new(
         id: impl Into<String>,
-        performer_name: impl Into<String>,
+        performer_id: impl Into<String>,
         start_time: SystemTime,
         instrument_id: impl Into<String>,
-        result_id: impl Into<String>,
+        result_ids: Vec<String>,
     ) -> Self {
         Self {
             id: id.into(),
-            performer_name: performer_name.into(),
+            performer_id: performer_id.into(),
             start_time,
             instrument_id: instrument_id.into(),
-            result_id: result_id.into(),
+            result_ids,
         }
     }
 }
@@ -151,5 +156,20 @@ impl CasePerson {
     pub fn with_given_name(mut self, given_name: impl Into<String>) -> Self {
         self.given_name = Some(given_name.into());
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_id_creates_unique_uuid_iris() {
+        let first = new_id();
+        let second = new_id();
+
+        assert!(first.starts_with("urn:uuid:"));
+        assert_eq!(first.len(), "urn:uuid:".len() + 36);
+        assert_ne!(first, second);
     }
 }

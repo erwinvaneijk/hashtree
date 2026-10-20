@@ -5,22 +5,34 @@
 
 use std::time::SystemTime;
 
-use crate::encoding::DigestEncoding;
+use crate::algorithm::Algorithm;
 use crate::error::AppResult;
 use crate::model::DirHasherResult;
 
 use super::bundle::CaseBundle;
-use super::ontology::{CaseAction, CaseFile, CaseHash, CasePerson, CaseTool};
-use super::serializer::{
-    serialize_action, serialize_bundle, serialize_file, serialize_person, serialize_tool,
-};
+use super::ontology::{CaseAction, CaseFile, CaseHash, CasePerson, CaseTool, new_id};
+use super::serializer::{serialize_action, serialize_file, serialize_person, serialize_tool};
 
-/// Convert a DirHasherResult to a CASE Bundle, rendering the digests in the
-/// requested encoding
-pub fn convert_to_case(
-    result: &DirHasherResult,
-    encoding: DigestEncoding,
-) -> AppResult<CaseBundle> {
+/// Name of the algorithm in the UCO HashNameVocab. The vocabulary is open:
+/// RIPEMD-160 is not part of it, so its name only follows the same pattern.
+pub fn case_hash_method(algorithm: &Algorithm) -> String {
+    match algorithm {
+        Algorithm::Md5 => "MD5".to_string(),
+        Algorithm::Sha1 => "SHA1".to_string(),
+        Algorithm::Sha256 => "SHA256".to_string(),
+        Algorithm::Sha384 => "SHA384".to_string(),
+        Algorithm::Sha512 => "SHA512".to_string(),
+        Algorithm::Sha3_256 => "SHA3-256".to_string(),
+        Algorithm::Sha3_384 => "SHA3-384".to_string(),
+        Algorithm::Sha3_512 => "SHA3-512".to_string(),
+        Algorithm::Ripemd160 => "RIPEMD160".to_string(),
+        Algorithm::Other(value) => value.to_ascii_uppercase(),
+    }
+}
+
+/// Convert a DirHasherResult to a CASE Bundle. CASE types hash values as
+/// xsd:hexBinary, so the digests are always written in hexadecimal.
+pub fn convert_to_case(result: &DirHasherResult) -> AppResult<CaseBundle> {
     let mut bundle = CaseBundle::new();
 
     // Get current user for performer
@@ -28,7 +40,7 @@ pub fn convert_to_case(
 
     // Create tool object
     let tool = CaseTool::new(
-        "case:tool-hashtree-1",
+        new_id(),
         "hashtree",
         crate::VERSION.to_string(),
         "hash-calculator",
@@ -36,15 +48,15 @@ pub fn convert_to_case(
     bundle.add_object(serialize_tool(&tool));
 
     // Create person object
-    let person = CasePerson::new("case:identity-operator", &username);
+    let person = CasePerson::new(new_id(), &username);
     bundle.add_object(serialize_person(&person));
 
-    // Collect file IDs for bundle
+    // Collect file IDs for the investigative action
     let mut file_ids = Vec::new();
 
     // Convert each file
     for (file_path, digest_result) in &result.content {
-        let file_id = format!("case:file-{}", file_ids.len() + 1);
+        let file_id = new_id();
         file_ids.push(file_id.clone());
 
         // Extract filename from path
@@ -59,8 +71,7 @@ pub fn convert_to_case(
 
         // Add hashes
         for (algorithm, hex_digest) in &digest_result.digests {
-            let encoded_digest = encoding.render(hex_digest);
-            let hash = CaseHash::new(algorithm.oldstyle_label(), encoded_digest);
+            let hash = CaseHash::new(case_hash_method(algorithm), hex_digest.clone());
             case_file.hashes.push(hash);
         }
 
@@ -69,16 +80,13 @@ pub fn convert_to_case(
 
     // Create investigative action
     let action = CaseAction::new(
-        "case:action-hash-1",
-        &username,
+        new_id(),
+        person.id.clone(),
         SystemTime::now(),
-        "case:tool-hashtree-1",
-        "case:bundle-results",
+        tool.id.clone(),
+        file_ids,
     );
     bundle.add_object(serialize_action(&action));
-
-    // Create results bundle
-    bundle.add_object(serialize_bundle("case:bundle-results", &file_ids));
 
     Ok(bundle)
 }
@@ -86,8 +94,7 @@ pub fn convert_to_case(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::algorithm::Algorithm;
-    use crate::model::{DigestResult, DirHasherResult};
+    use crate::model::DigestResult;
 
     #[test]
     fn convert_to_case_creates_bundle_with_objects() -> AppResult<()> {
@@ -96,10 +103,10 @@ mod tests {
         digests.add_digest(Algorithm::Sha256, "abc123");
         result.content.insert("test.txt".to_string(), digests);
 
-        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
+        let bundle = convert_to_case(&result)?;
 
-        // Should have: tool, person, file, action, bundle
-        assert_eq!(bundle.graph.len(), 5);
+        // Should have: tool, person, file, action
+        assert_eq!(bundle.graph.len(), 4);
 
         Ok(())
     }
@@ -107,7 +114,7 @@ mod tests {
     #[test]
     fn convert_to_case_includes_tool_object() -> AppResult<()> {
         let result = DirHasherResult::default();
-        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
+        let bundle = convert_to_case(&result)?;
 
         let tool_found = bundle
             .graph
@@ -121,7 +128,7 @@ mod tests {
     #[test]
     fn convert_to_case_includes_person_object() -> AppResult<()> {
         let result = DirHasherResult::default();
-        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
+        let bundle = convert_to_case(&result)?;
 
         let person_found = bundle
             .graph
@@ -142,7 +149,7 @@ mod tests {
             .insert("file1.txt".to_string(), digests.clone());
         result.content.insert("file2.txt".to_string(), digests);
 
-        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
+        let bundle = convert_to_case(&result)?;
 
         let file_count = bundle
             .graph
@@ -157,10 +164,11 @@ mod tests {
     #[test]
     fn convert_to_case_includes_action_object() -> AppResult<()> {
         let result = DirHasherResult::default();
-        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
+        let bundle = convert_to_case(&result)?;
 
         let action_found = bundle.graph.iter().any(|obj| {
-            obj.get("@type").and_then(|t| t.as_str()) == Some("investigation:InvestigativeAction")
+            obj.get("@type").and_then(|t| t.as_str())
+                == Some("case-investigation:InvestigativeAction")
         });
 
         assert!(action_found, "Action object should be present");
@@ -168,36 +176,97 @@ mod tests {
     }
 
     #[test]
-    fn convert_to_case_includes_bundle_object() -> AppResult<()> {
-        let result = DirHasherResult::default();
-        let bundle = convert_to_case(&result, DigestEncoding::Hex)?;
+    fn convert_to_case_action_refers_to_every_file() -> AppResult<()> {
+        let mut result = DirHasherResult::default();
+        let mut digests = DigestResult::default();
+        digests.add_digest(Algorithm::Sha256, "abc123");
+        result
+            .content
+            .insert("file1.txt".to_string(), digests.clone());
+        result.content.insert("file2.txt".to_string(), digests);
 
-        let bundle_found = bundle
+        let bundle = convert_to_case(&result)?;
+
+        let file_ids: Vec<&serde_json::Value> = bundle
             .graph
             .iter()
-            .any(|obj| obj.get("@type").and_then(|t| t.as_str()) == Some("core:Bundle"));
+            .filter(|obj| obj.get("@type").and_then(|t| t.as_str()) == Some("observable:File"))
+            .filter_map(|obj| obj.get("@id"))
+            .collect();
+        let action = bundle
+            .graph
+            .iter()
+            .find(|obj| {
+                obj.get("@type").and_then(|t| t.as_str())
+                    == Some("case-investigation:InvestigativeAction")
+            })
+            .expect("action should be present");
+        let result_ids: Vec<&serde_json::Value> = action["action:result"]
+            .as_array()
+            .expect("action:result should be an array")
+            .iter()
+            .filter_map(|reference| reference.get("@id"))
+            .collect();
 
-        assert!(bundle_found, "Bundle object should be present");
+        assert_eq!(result_ids, file_ids);
         Ok(())
     }
 
     #[test]
-    fn convert_to_case_renders_long_digests_in_base64() -> AppResult<()> {
+    fn convert_to_case_writes_hex_digests_with_uco_hash_names() -> AppResult<()> {
         let hex_digest = "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e";
-        let base64_digest = "pZGm1Av0IEBKARczz7exkNYsZb8LzaMrV7J32a2fFG4=";
 
         let mut result = DirHasherResult::default();
         let mut digests = DigestResult::default();
         digests.add_digest(Algorithm::Sha256, hex_digest);
         result.content.insert("test.txt".to_string(), digests);
 
-        let bundle = convert_to_case(&result, DigestEncoding::Base64)?;
-        let serialized = serde_json::to_string(&bundle.graph)?;
+        let bundle = convert_to_case(&result)?;
+        let file = bundle
+            .graph
+            .iter()
+            .find(|obj| obj.get("@type").and_then(|t| t.as_str()) == Some("observable:File"))
+            .expect("file should be present");
+        let hash = &file["core:hasFacet"][1]["observable:hash"][0];
 
-        assert!(
-            serialized.contains(base64_digest),
-            "CASE output should contain the base64 digest"
+        assert_eq!(hash["types:hashMethod"], serde_json::json!("SHA256"));
+        assert_eq!(
+            hash["types:hashValue"]["@value"],
+            serde_json::json!(hex_digest)
         );
         Ok(())
+    }
+
+    #[test]
+    fn case_hash_method_uses_hash_name_vocabulary() {
+        assert_eq!(case_hash_method(&Algorithm::Md5), "MD5");
+        assert_eq!(case_hash_method(&Algorithm::Sha1), "SHA1");
+        assert_eq!(case_hash_method(&Algorithm::Sha256), "SHA256");
+        assert_eq!(case_hash_method(&Algorithm::Sha384), "SHA384");
+        assert_eq!(case_hash_method(&Algorithm::Sha512), "SHA512");
+        assert_eq!(case_hash_method(&Algorithm::Sha3_256), "SHA3-256");
+        assert_eq!(case_hash_method(&Algorithm::Sha3_384), "SHA3-384");
+        assert_eq!(case_hash_method(&Algorithm::Sha3_512), "SHA3-512");
+        assert_eq!(case_hash_method(&Algorithm::Ripemd160), "RIPEMD160");
+    }
+
+    #[test]
+    fn case_hash_methods_are_read_back_as_the_same_algorithm() {
+        for algorithm in [
+            Algorithm::Md5,
+            Algorithm::Sha1,
+            Algorithm::Sha256,
+            Algorithm::Sha384,
+            Algorithm::Sha512,
+            Algorithm::Sha3_256,
+            Algorithm::Sha3_384,
+            Algorithm::Sha3_512,
+            Algorithm::Ripemd160,
+        ] {
+            assert_eq!(
+                Algorithm::from_name(&case_hash_method(&algorithm)),
+                algorithm
+            );
+        }
     }
 }

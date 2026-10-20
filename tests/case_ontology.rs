@@ -124,10 +124,20 @@ fn case_output_contains_hashes() {
         .find(|obj| obj.get("@type").and_then(serde_json::Value::as_str) == Some("observable:File"))
         .expect("should have observable:File");
 
-    let hashes = file_obj
-        .get("observable:hashes")
+    let content_data_facet = file_obj
+        .get("core:hasFacet")
         .and_then(serde_json::Value::as_array)
-        .expect("observable:hashes should be an array");
+        .and_then(|facets| {
+            facets.iter().find(|facet| {
+                facet.get("@type").and_then(serde_json::Value::as_str)
+                    == Some("observable:ContentDataFacet")
+            })
+        })
+        .expect("file should have an observable:ContentDataFacet");
+    let hashes = content_data_facet
+        .get("observable:hash")
+        .and_then(serde_json::Value::as_array)
+        .expect("observable:hash should be an array");
 
     assert!(!hashes.is_empty(), "file should have at least one hash");
 
@@ -209,12 +219,12 @@ fn case_output_contains_investigative_action() {
 
     let has_action = graph.iter().any(|obj| {
         obj.get("@type").and_then(serde_json::Value::as_str)
-            == Some("investigation:InvestigativeAction")
+            == Some("case-investigation:InvestigativeAction")
     });
 
     assert!(
         has_action,
-        "graph should contain investigation:InvestigativeAction"
+        "graph should contain case-investigation:InvestigativeAction"
     );
 }
 
@@ -371,4 +381,30 @@ fn verify_case_format_with_compact_json() {
         .arg(&test_file);
 
     verify_cmd.assert().success();
+}
+
+#[test]
+fn verify_case_manifest_written_by_jhashtools() {
+    // tests/fixtures/jhashtools_case.jsonld was written by jHashtools with
+    // `-a -s case` for tests/fixtures/basic_tree, run from the repository root.
+    let mut cmd = Command::cargo_bin("hashtree").expect("binary should exist");
+    cmd.current_dir(env!("CARGO_MANIFEST_DIR"))
+        .arg("verify")
+        .args([
+            "--md5",
+            "--sha-1",
+            "--sha-256",
+            "--sha-384",
+            "--sha-512",
+            "--ripemd-160",
+        ])
+        .arg("--style")
+        .arg("case")
+        .arg("-i")
+        .arg("tests/fixtures/jhashtools_case.jsonld")
+        .arg("tests/fixtures/basic_tree");
+
+    cmd.assert()
+        .success()
+        .stdout(contains("*** PASSED VERIFICATION ***"));
 }

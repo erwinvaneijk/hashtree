@@ -6,6 +6,39 @@
 
 use serde_json::{Map, Value, json};
 
+/// Prefixes of the CASE/UCO 1.5.0 namespaces used in the JSON-LD output
+pub const UCO_CONTEXT: [(&str, &str); 8] = [
+    (
+        "action",
+        "https://ontology.unifiedcyberontology.org/uco/action/",
+    ),
+    (
+        "case-investigation",
+        "https://ontology.caseontology.org/case/investigation/",
+    ),
+    (
+        "core",
+        "https://ontology.unifiedcyberontology.org/uco/core/",
+    ),
+    (
+        "identity",
+        "https://ontology.unifiedcyberontology.org/uco/identity/",
+    ),
+    (
+        "observable",
+        "https://ontology.unifiedcyberontology.org/uco/observable/",
+    ),
+    (
+        "tool",
+        "https://ontology.unifiedcyberontology.org/uco/tool/",
+    ),
+    (
+        "types",
+        "https://ontology.unifiedcyberontology.org/uco/types/",
+    ),
+    ("xsd", "http://www.w3.org/2001/XMLSchema#"),
+];
+
 /// CASE JSON-LD Bundle
 #[derive(Debug, Clone)]
 pub struct CaseBundle {
@@ -16,43 +49,12 @@ pub struct CaseBundle {
 }
 
 impl CaseBundle {
-    /// Create a new CASE bundle with standard ontology context
+    /// Create a new CASE bundle with the CASE/UCO ontology context
     pub fn new() -> Self {
-        let mut context = Map::new();
-
-        // Standard RDF/CASE namespaces
-        context.insert(
-            "rdf".to_string(),
-            Value::String("http://www.w3.org/1999/02/22-rdf-syntax-ns#".to_string()),
-        );
-        context.insert(
-            "observable".to_string(),
-            Value::String("https://ontology.caseontology.org/observable/".to_string()),
-        );
-        context.insert(
-            "types".to_string(),
-            Value::String("https://ontology.caseontology.org/types/".to_string()),
-        );
-        context.insert(
-            "investigation".to_string(),
-            Value::String("https://ontology.caseontology.org/investigation/".to_string()),
-        );
-        context.insert(
-            "action".to_string(),
-            Value::String("https://ontology.caseontology.org/action/".to_string()),
-        );
-        context.insert(
-            "tool".to_string(),
-            Value::String("https://ontology.caseontology.org/tool/".to_string()),
-        );
-        context.insert(
-            "core".to_string(),
-            Value::String("https://ontology.caseontology.org/core/".to_string()),
-        );
-        context.insert(
-            "identity".to_string(),
-            Value::String("https://ontology.caseontology.org/identity/".to_string()),
-        );
+        let context = UCO_CONTEXT
+            .iter()
+            .map(|(prefix, namespace)| (prefix.to_string(), Value::String(namespace.to_string())))
+            .collect();
 
         Self {
             context,
@@ -90,8 +92,12 @@ mod tests {
 
         assert!(bundle.context.contains_key("observable"));
         assert!(bundle.context.contains_key("types"));
-        assert!(bundle.context.contains_key("investigation"));
+        assert!(bundle.context.contains_key("case-investigation"));
         assert!(bundle.context.contains_key("core"));
+        assert_eq!(
+            bundle.context.get("observable").and_then(Value::as_str),
+            Some("https://ontology.unifiedcyberontology.org/uco/observable/")
+        );
     }
 
     #[test]

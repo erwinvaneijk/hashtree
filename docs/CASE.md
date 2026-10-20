@@ -35,76 +35,83 @@ hashtree create --all --style case -o evidence.jsonld ./evidence_files/
 hashtree create --sha-256 --style case --compact-json -o hashes.jsonld files/
 ```
 
-### Base64 Hash Values
+### Hash Values Are Hexadecimal
 
-```bash
-hashtree create --sha-256 --style case --base64 -o hashes.jsonld files/
-```
-
-With `--base64`, `types:hashValue` holds the base64 encoding of the digest for
-algorithms of at least 256 bits (SHA-256 and longer); shorter digests such as
-MD5 and SHA-1 remain hexadecimal. Verification accepts both encodings, so a
-base64 manifest can be verified without passing `--base64`.
+CASE types `types:hashValue` as `xsd:hexBinary`, so CASE manifests always hold
+hexadecimal digests. `--base64` does not change a CASE manifest; it still
+controls how digests are printed on the console. Manifests written by hashtree
+3.0.1 and earlier may hold base64 digests; verification still accepts those.
 
 ## Output Structure
 
-CASE output follows the JSON-LD format with `@context` and `@graph` fields:
+The output follows CASE/UCO 1.5.0. Every object has its own `urn:uuid:` IRI, as
+UCO requires for facets and hashes. A manifest for one file looks like this
+(see [examples/example_case_output.jsonld](../examples/example_case_output.jsonld)):
 
 ```json
 {
   "@context": {
-    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-    "observable": "https://ontology.caseontology.org/observable/",
-    "types": "https://ontology.caseontology.org/types/",
-    "investigation": "https://ontology.caseontology.org/investigation/",
-    "action": "https://ontology.caseontology.org/action/",
-    "tool": "https://ontology.caseontology.org/tool/",
-    "core": "https://ontology.caseontology.org/core/",
-    "identity": "https://ontology.caseontology.org/identity/"
+    "action": "https://ontology.unifiedcyberontology.org/uco/action/",
+    "case-investigation": "https://ontology.caseontology.org/case/investigation/",
+    "core": "https://ontology.unifiedcyberontology.org/uco/core/",
+    "identity": "https://ontology.unifiedcyberontology.org/uco/identity/",
+    "observable": "https://ontology.unifiedcyberontology.org/uco/observable/",
+    "tool": "https://ontology.unifiedcyberontology.org/uco/tool/",
+    "types": "https://ontology.unifiedcyberontology.org/uco/types/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
   },
   "@graph": [
-    // Tool description
     {
-      "@id": "case:tool-hashtree-1",
+      "@id": "urn:uuid:face736b-7e6f-4bb8-b65d-31eb282004a1",
       "@type": "tool:AnalyticTool",
-      "tool:name": "hashtree",
-      "tool:version": "1.1.0",
-      "tool:toolType": "hash-calculator"
+      "core:name": "hashtree",
+      "tool:toolType": "hash-calculator",
+      "tool:version": "3.0.1"
     },
-    // Operator/performer
     {
-      "@id": "case:identity-operator",
+      "@id": "urn:uuid:3600e66d-eb63-4d89-ac54-381522d92bf6",
       "@type": "identity:Person",
-      "core:name": "username"
+      "core:name": "forensic_examiner"
     },
-    // File and hashes
     {
-      "@id": "case:file-1",
+      "@id": "urn:uuid:66f9b775-5ffa-46e1-81b6-f399ea32d6fd",
       "@type": "observable:File",
-      "observable:filePath": "/path/to/file.txt",
-      "observable:fileName": "file.txt",
-      "observable:hashes": [
+      "core:hasFacet": [
         {
-          "types:hashMethod": "SHA-256",
-          "types:hashValue": "1f11452d48f3435b4447347b259055774020dab4e936b8c4c1f1b5ecd05a8ed1"
+          "@id": "urn:uuid:ed136e4f-70c1-4aa5-a7be-ad4f6e354622",
+          "@type": "observable:FileFacet",
+          "observable:fileName": "notes.txt",
+          "observable:filePath": "evidence/notes.txt"
+        },
+        {
+          "@id": "urn:uuid:17056f34-6993-4477-afcd-1e564b964255",
+          "@type": "observable:ContentDataFacet",
+          "observable:hash": [
+            {
+              "@id": "urn:uuid:555a2db2-0514-4aeb-950d-50415914e56c",
+              "@type": "types:Hash",
+              "types:hashMethod": "SHA256",
+              "types:hashValue": {
+                "@type": "xsd:hexBinary",
+                "@value": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+              }
+            }
+          ]
         }
       ]
     },
-    // Investigative action
     {
-      "@id": "case:action-hash-1",
-      "@type": "investigation:InvestigativeAction",
-      "investigation:performer": "case:identity-operator",
-      "action:startTime": "2026-10-12T10:08:06.020+02:00",
-      "action:instrument": { "@id": "case:tool-hashtree-1" },
-      "action:result": { "@id": "case:bundle-results" }
-    },
-    // Results bundle
-    {
-      "@id": "case:bundle-results",
-      "@type": "core:Bundle",
-      "core:hasFacet": [
-        { "@id": "case:file-1" }
+      "@id": "urn:uuid:3825a8d5-94ad-44de-85c5-7848ddd81d8b",
+      "@type": "case-investigation:InvestigativeAction",
+      "core:name": "Compute digests",
+      "action:startTime": {
+        "@type": "xsd:dateTime",
+        "@value": "2026-10-20T11:54:35.116+02:00"
+      },
+      "action:performer": { "@id": "urn:uuid:3600e66d-eb63-4d89-ac54-381522d92bf6" },
+      "action:instrument": { "@id": "urn:uuid:face736b-7e6f-4bb8-b65d-31eb282004a1" },
+      "action:result": [
+        { "@id": "urn:uuid:66f9b775-5ffa-46e1-81b6-f399ea32d6fd" }
       ]
     }
   ]
@@ -115,40 +122,53 @@ CASE output follows the JSON-LD format with `@context` and `@graph` fields:
 
 The output includes these key CASE objects:
 
-| Object | Type | Purpose |
-|--------|------|---------|
-| `tool:AnalyticTool` | Tool description | Documents hashtree version and capabilities |
-| `identity:Person` | Operator info | Records who performed the hashing |
-| `observable:File` | File metadata | Contains file path and hashes |
-| `types:Hash` | Hash values | Algorithm and digest value (hexadecimal, or base64 with `--base64`) |
-| `investigation:InvestigativeAction` | Action metadata | Documents when and how hashing was performed |
-| `core:Bundle` | Results wrapper | Groups all objects together |
+| Object | Purpose |
+|--------|---------|
+| `tool:AnalyticTool` | Documents the hashtree version |
+| `identity:Person` | Records who performed the hashing |
+| `observable:File` | One per hashed file, with its facets in `core:hasFacet` |
+| `observable:FileFacet` | File path and name |
+| `observable:ContentDataFacet` | The file's hashes in `observable:hash` |
+| `types:Hash` | Algorithm (`types:hashMethod`) and hexadecimal digest (`types:hashValue`) |
+| `case-investigation:InvestigativeAction` | When the hashing was done, by whom, with which tool, and which files resulted |
+
+Hash methods use the names of the UCO `HashNameVocab`: `MD5`, `SHA1`, `SHA256`,
+`SHA384`, `SHA512`, `SHA3-256`, `SHA3-384` and `SHA3-512`. RIPEMD-160 is not part
+of that open vocabulary and is written as `RIPEMD160`.
 
 ## Validation
 
-To validate CASE output structure:
+Validate a manifest against the CASE/UCO SHACL shapes with `case_validate` from
+[case-utils](https://github.com/casework/CASE-Utilities-Python):
 
 ```bash
-# Check if output is valid JSON
-jq . output.jsonld
+pip install case-utils
+case_validate --built-version case-1.5.0 --allow-info output.jsonld
+```
 
-# Verify presence of required fields
-jq '.["@context"]' output.jsonld
-jq '.["@graph"][] | select(."@type" == "observable:File")' output.jsonld
+`--allow-info` is needed when the manifest holds RIPEMD-160 digests: the
+validator reports `RIPEMD160` as an informational "not a member of the
+vocabulary HashNameVocab" result.
 
+To inspect the output with `jq`:
+
+```bash
 # Count files in output
-jq '.["@graph"][] | select(."@type" == "observable:File")' output.jsonld | wc -l
+jq '[.["@graph"][] | select(."@type" == "observable:File")] | length' output.jsonld
 
 # Extract hash values
-jq '.["@graph"][] | select(."@type" == "observable:File") | .["observable:hashes"][]' output.jsonld
+jq '.["@graph"][] | select(."@type" == "observable:File") | .["core:hasFacet"][]
+    | select(."@type" == "observable:ContentDataFacet") | .["observable:hash"][]' output.jsonld
 ```
 
 ## Compatibility
 
-- **JSON-LD**: Full compliance with JSON-LD specification
-- **CASE Ontology**: Uses official CASE ontology namespaces
-- **Interoperability**: Output can be processed by CASE-aware tools
-- **Standards**: Aligns with DFRWS and CDO standards
+- **CASE/UCO 1.5.0**: validated with `case_validate` (see above)
+- **jHashtools**: writes and reads the same structure with `-s case`, so either
+  tool can verify a manifest written by the other
+- **Older manifests**: manifests written by hashtree 3.0.1 and earlier used other
+  namespaces and kept the hashes directly on the file; `verify` recognises them
+  and still reads them
 
 ## Verification
 
@@ -195,7 +215,6 @@ hashtree verify --input hashes.jsonld --style case --sha-256 files/
 
 Planned improvements for future releases:
 
-- CASE schema validation
 - Extended provenance metadata
 - Digital evidence chain tracking
 - RDF/XML export format

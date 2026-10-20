@@ -3,6 +3,7 @@
 //!
 //! Handles conversion of CASE objects to JSON-LD format for export.
 
+use chrono::SecondsFormat;
 use serde_json::{Map, Value, json};
 use std::fs::File;
 use std::io::Write;
@@ -10,68 +11,83 @@ use std::path::Path;
 use std::time::SystemTime;
 
 use super::CaseBundle;
-use super::ontology::{CaseAction, CaseFile, CaseHash, CasePerson, CaseTool};
+use super::ontology::{CaseAction, CaseFile, CaseHash, CasePerson, CaseTool, new_id};
 use crate::error::AppResult;
 
-/// Format a SystemTime as ISO 8601 with timezone
-fn format_time(time: SystemTime) -> String {
-    let datetime = chrono::DateTime::<chrono::Local>::from(time);
-    datetime.format("%Y-%m-%dT%H:%M:%S%.3f%z").to_string()
+/// Create a JSON-LD literal of the given XSD datatype
+fn typed_literal(datatype: &str, value: &str) -> Value {
+    json!({"@type": datatype, "@value": value})
 }
 
-/// Serialize a CaseHash to JSON-LD object
+/// Format a SystemTime as an xsd:dateTime literal (ISO 8601 with timezone)
+fn format_time(time: SystemTime) -> Value {
+    let datetime = chrono::DateTime::<chrono::Local>::from(time);
+    typed_literal(
+        "xsd:dateTime",
+        &datetime.to_rfc3339_opts(SecondsFormat::Millis, false),
+    )
+}
+
+/// Serialize a CaseHash to a JSON-LD types:Hash object
 pub fn serialize_hash(hash: &CaseHash) -> Value {
     json!({
+        "@id": new_id(),
+        "@type": "types:Hash",
         "types:hashMethod": hash.hash_method,
-        "types:hashValue": hash.hash_value
+        "types:hashValue": typed_literal("xsd:hexBinary", &hash.hash_value)
     })
 }
 
-/// Serialize a CaseFile to JSON-LD object
+/// Serialize a CaseFile to a JSON-LD observable:File object with a FileFacet
+/// and, when it has hashes, a ContentDataFacet
 pub fn serialize_file(file: &CaseFile) -> Value {
-    let mut obj = Map::new();
+    let mut file_facet = Map::new();
 
-    obj.insert("@id".to_string(), Value::String(file.id.clone()));
-    obj.insert(
+    file_facet.insert("@id".to_string(), Value::String(new_id()));
+    file_facet.insert(
         "@type".to_string(),
-        Value::String("observable:File".to_string()),
+        Value::String("observable:FileFacet".to_string()),
     );
-    obj.insert(
-        "observable:filePath".to_string(),
-        Value::String(file.file_path.clone()),
-    );
-    obj.insert(
+    file_facet.insert(
         "observable:fileName".to_string(),
         Value::String(file.file_name.clone()),
     );
+    file_facet.insert(
+        "observable:filePath".to_string(),
+        Value::String(file.file_path.clone()),
+    );
 
     if let Some(modified) = file.modified_time {
-        obj.insert(
-            "observable:modifiedTime".to_string(),
-            Value::String(format_time(modified)),
-        );
+        file_facet.insert("observable:modifiedTime".to_string(), format_time(modified));
     }
 
     if let Some(accessed) = file.accessed_time {
-        obj.insert(
-            "observable:accessedTime".to_string(),
-            Value::String(format_time(accessed)),
-        );
+        file_facet.insert("observable:accessedTime".to_string(), format_time(accessed));
     }
 
     if let Some(created) = file.creation_time {
-        obj.insert(
-            "observable:creationTime".to_string(),
-            Value::String(format_time(created)),
+        file_facet.insert(
+            "observable:observableCreatedTime".to_string(),
+            format_time(created),
         );
     }
 
+    let mut facets = vec![Value::Object(file_facet)];
+
     if !file.hashes.is_empty() {
         let hashes: Vec<Value> = file.hashes.iter().map(serialize_hash).collect();
-        obj.insert("observable:hashes".to_string(), Value::Array(hashes));
+        facets.push(json!({
+            "@id": new_id(),
+            "@type": "observable:ContentDataFacet",
+            "observable:hash": hashes
+        }));
     }
 
-    Value::Object(obj)
+    json!({
+        "@id": file.id,
+        "@type": "observable:File",
+        "core:hasFacet": facets
+    })
 }
 
 /// Serialize a CaseTool to JSON-LD object
@@ -79,7 +95,7 @@ pub fn serialize_tool(tool: &CaseTool) -> Value {
     json!({
         "@id": tool.id,
         "@type": "tool:AnalyticTool",
-        "tool:name": tool.name,
+        "core:name": tool.name,
         "tool:version": tool.version,
         "tool:toolType": tool.tool_type
     })
@@ -87,31 +103,21 @@ pub fn serialize_tool(tool: &CaseTool) -> Value {
 
 /// Serialize a CaseAction to JSON-LD object
 pub fn serialize_action(action: &CaseAction) -> Value {
-    let mut obj = Map::new();
+    let results: Vec<Value> = action
+        .result_ids
+        .iter()
+        .map(|id| json!({"@id": id}))
+        .collect();
 
-    obj.insert("@id".to_string(), Value::String(action.id.clone()));
-    obj.insert(
-        "@type".to_string(),
-        Value::String("investigation:InvestigativeAction".to_string()),
-    );
-    obj.insert(
-        "investigation:performer".to_string(),
-        Value::String("case:identity-operator".to_string()),
-    );
-    obj.insert(
-        "action:startTime".to_string(),
-        Value::String(format_time(action.start_time)),
-    );
-    obj.insert(
-        "action:instrument".to_string(),
-        json!({"@id": action.instrument_id}),
-    );
-    obj.insert(
-        "action:result".to_string(),
-        json!({"@id": action.result_id}),
-    );
-
-    Value::Object(obj)
+    json!({
+        "@id": action.id,
+        "@type": "case-investigation:InvestigativeAction",
+        "core:name": "Compute digests",
+        "action:startTime": format_time(action.start_time),
+        "action:performer": {"@id": action.performer_id},
+        "action:instrument": {"@id": action.instrument_id},
+        "action:result": results
+    })
 }
 
 /// Serialize a CasePerson to JSON-LD object
@@ -135,17 +141,6 @@ pub fn serialize_person(person: &CasePerson) -> Value {
     Value::Object(obj)
 }
 
-/// Serialize a CASE bundle with file references to JSON-LD object
-pub fn serialize_bundle(bundle_id: &str, file_ids: &[String]) -> Value {
-    let facets: Vec<Value> = file_ids.iter().map(|id| json!({"@id": id})).collect();
-
-    json!({
-        "@id": bundle_id,
-        "@type": "core:Bundle",
-        "core:hasFacet": facets
-    })
-}
-
 /// Write a CASE bundle to a file in JSON-LD format
 pub fn serialize_case(path: &Path, bundle: &CaseBundle, pretty: bool) -> AppResult<()> {
     let json_value = bundle.to_json();
@@ -166,23 +161,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn serialize_hash_includes_algorithm_and_value() {
-        let hash = CaseHash::new("SHA-256", "abc123");
+    fn serialize_hash_includes_algorithm_and_typed_value() {
+        let hash = CaseHash::new("SHA256", "abc123");
         let json = serialize_hash(&hash);
 
         assert_eq!(
-            json.get("types:hashMethod").and_then(Value::as_str),
-            Some("SHA-256")
+            json.get("@type").and_then(Value::as_str),
+            Some("types:Hash")
+        );
+        assert!(
+            json.get("@id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| id.starts_with("urn:uuid:"))
         );
         assert_eq!(
-            json.get("types:hashValue").and_then(Value::as_str),
-            Some("abc123")
+            json.get("types:hashMethod").and_then(Value::as_str),
+            Some("SHA256")
+        );
+        assert_eq!(
+            json.get("types:hashValue"),
+            Some(&json!({"@type": "xsd:hexBinary", "@value": "abc123"}))
         );
     }
 
     #[test]
-    fn serialize_file_includes_required_fields() {
-        let file = CaseFile::new("file-1", "/path/to/file.txt", "file.txt");
+    fn serialize_file_puts_path_and_hashes_in_facets() {
+        let file = CaseFile::new("file-1", "/path/to/file.txt", "file.txt")
+            .with_hash(CaseHash::new("SHA256", "abc123"));
         let json = serialize_file(&file);
 
         assert_eq!(json.get("@id").and_then(Value::as_str), Some("file-1"));
@@ -190,13 +195,67 @@ mod tests {
             json.get("@type").and_then(Value::as_str),
             Some("observable:File")
         );
+        let facets = json
+            .get("core:hasFacet")
+            .and_then(Value::as_array)
+            .expect("core:hasFacet should be an array");
+        assert_eq!(facets.len(), 2);
         assert_eq!(
-            json.get("observable:filePath").and_then(Value::as_str),
+            facets[0].get("@type").and_then(Value::as_str),
+            Some("observable:FileFacet")
+        );
+        assert_eq!(
+            facets[0].get("observable:filePath").and_then(Value::as_str),
             Some("/path/to/file.txt")
         );
         assert_eq!(
-            json.get("observable:fileName").and_then(Value::as_str),
+            facets[0].get("observable:fileName").and_then(Value::as_str),
             Some("file.txt")
+        );
+        assert_eq!(
+            facets[1].get("@type").and_then(Value::as_str),
+            Some("observable:ContentDataFacet")
+        );
+        assert_eq!(
+            facets[1]
+                .get("observable:hash")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn serialize_file_without_hashes_has_only_a_file_facet() {
+        let file = CaseFile::new("file-1", "/path/to/file.txt", "file.txt");
+        let json = serialize_file(&file);
+
+        assert_eq!(
+            json.get("core:hasFacet")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn serialize_file_writes_times_as_xsd_date_time() {
+        let mut file = CaseFile::new("file-1", "/path/to/file.txt", "file.txt");
+        file.accessed_time = Some(SystemTime::UNIX_EPOCH);
+        let json = serialize_file(&file);
+
+        let accessed = &json["core:hasFacet"][0]["observable:accessedTime"];
+        assert_eq!(
+            accessed.get("@type").and_then(Value::as_str),
+            Some("xsd:dateTime")
+        );
+        let value = accessed
+            .get("@value")
+            .and_then(Value::as_str)
+            .expect("accessedTime should have a value");
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(value).is_ok(),
+            "{value} should be RFC 3339"
         );
     }
 
@@ -211,13 +270,37 @@ mod tests {
             Some("tool:AnalyticTool")
         );
         assert_eq!(
-            json.get("tool:name").and_then(Value::as_str),
+            json.get("core:name").and_then(Value::as_str),
             Some("hashtree")
         );
         assert_eq!(
             json.get("tool:version").and_then(Value::as_str),
             Some("1.0.0")
         );
+    }
+
+    #[test]
+    fn serialize_action_refers_to_performer_tool_and_results() {
+        let action = CaseAction::new(
+            "action-1",
+            "person-1",
+            SystemTime::UNIX_EPOCH,
+            "tool-1",
+            vec!["file-1".to_string(), "file-2".to_string()],
+        );
+        let json = serialize_action(&action);
+
+        assert_eq!(
+            json.get("@type").and_then(Value::as_str),
+            Some("case-investigation:InvestigativeAction")
+        );
+        assert_eq!(json["action:performer"], json!({"@id": "person-1"}));
+        assert_eq!(json["action:instrument"], json!({"@id": "tool-1"}));
+        assert_eq!(
+            json["action:result"],
+            json!([{"@id": "file-1"}, {"@id": "file-2"}])
+        );
+        assert_eq!(json["action:startTime"]["@type"], json!("xsd:dateTime"));
     }
 
     #[test]

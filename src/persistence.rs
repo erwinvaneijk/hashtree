@@ -32,7 +32,7 @@ pub fn persist_result(
         }
         PersistenceStyle::OldStyle => persist_oldstyle(path, result, encoding),
         PersistenceStyle::Case => {
-            let case_bundle = case::convert_to_case(result, encoding)?;
+            let case_bundle = case::convert_to_case(result)?;
             case::serialize_case(path, &case_bundle, pretty_json)?;
             Ok(())
         }
@@ -206,7 +206,6 @@ mod tests {
         for (style, file_name) in [
             (PersistenceStyle::Json, "hashes.json"),
             (PersistenceStyle::OldStyle, "hashes.txt"),
-            (PersistenceStyle::Case, "hashes.jsonld"),
         ] {
             let temp = TempDir::new().expect("temp directory should be created");
             let file_path = temp.path().join(file_name);
@@ -236,5 +235,32 @@ mod tests {
                 "{style:?} manifest should decode back to hexadecimal"
             );
         }
+    }
+
+    #[test]
+    fn case_manifests_are_written_in_hex_even_with_base64() {
+        let temp = TempDir::new().expect("temp directory should be created");
+        let file_path = temp.path().join("hashes.jsonld");
+
+        let mut digests = DigestResult::default();
+        digests.add_digest(Algorithm::Sha256, SHA256_HEX);
+        let mut result = DirHasherResult::default();
+        result.content.insert("example.txt".to_string(), digests);
+
+        persist_result(
+            &file_path,
+            PersistenceStyle::Case,
+            &result,
+            true,
+            DigestEncoding::Base64,
+        )
+        .expect("manifest should be written");
+
+        let written = fs::read_to_string(&file_path).expect("manifest should be readable");
+        assert!(written.contains(SHA256_HEX), "got: {written}");
+        assert!(!written.contains(SHA256_BASE64), "got: {written}");
+        let reloaded =
+            load_result(&file_path, PersistenceStyle::Case).expect("manifest should load");
+        assert_eq!(reloaded.content, result.content);
     }
 }
